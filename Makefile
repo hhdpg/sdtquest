@@ -1,6 +1,6 @@
 # Makefile for dingtalk-qa-bot
 
-.PHONY: install run dev test lint format build-knowledge parse-code clean
+.PHONY: install run dev test lint format build-knowledge parse-code clean push
 
 # 安装依赖
 install:
@@ -48,3 +48,7 @@ clean:
 	rm -rf .pytest_cache
 	rm -rf .coverage
 	rm -rf htmlcov/
+
+# 推送到 GitHub
+push:
+	@./scripts/git-push.sh $(MSG)
