@@ -1,0 +1,51 @@
+[project]
+name = "dingtalk-qa-bot"
+version = "0.1.0"
+description = "钉钉智能问答机器人 — 基于本地大模型的 RAG 问答系统"
+requires-python = ">=3.11"
+
+dependencies = [
+    # Web & 钉钉
+    "fastapi>=0.110",
+    "uvicorn>=0.27",
+    "dingtalk-stream>=0.15",
+
+    # RAG & 向量
+    "chromadb>=0.5",
+    "llama-index>=0.10",
+
+    # LLM
+    "httpx>=0.27",             # 异步 HTTP 客户端
+
+    # 代码解析
+    "tree-sitter>=0.22",
+    "tree-sitter-javascript>=0.21",
+    "beautifulsoup4>=4.12",    # HTML 解析
+
+    # 工具
+    "pydantic>=2.6",
+    "pydantic-settings>=2.2",
+    "python-dotenv>=1.0",
+    "loguru>=0.7",
+    "apscheduler>=3.10",
+    "numpy>=1.26",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=5.0",
+    "ruff>=0.4",
+    "mypy>=1.10",
+]
+dashboard = [
+    "streamlit>=1.32",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
