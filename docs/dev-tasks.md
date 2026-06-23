@@ -18,7 +18,7 @@
 | 4 | RAG 模块 — Embedding + 检索 + 上下文 | ✅ | #2, #3 | 2-3天 | 已完成 |
 | 5 | Parser 模块 — Vue 2 代码解析器 | 🔲 | #2 | 3-4天 | |
 | 6 | Infrastructure 层 — SQLite + Repository | ✅ | #2 | 1-2天 | 已完成 |
-| 7 | Services 层 — QA/知识库/分析服务 | 🔲 | #3,#4,#5,#6 | 2天 | |
+| 7 | Services 层 — QA/知识库/分析服务 | ✅ | #3,#4,#5,#6 | 2天 | 已完成（通过 Protocol 可选注入 Parser/Analyzer） |
 | 8 | Bot 模块 — 钉钉 Stream 消息收发 | 🔲 | #7 | 2-3天 | |
 | 9 | Analyzer 模块 — 分类/汇总/日报 | 🔲 | #2, #6 | 1-2天 | |
 | 10 | API 层 — FastAPI 路由 + 启动入口 | 🔲 | #7, #8 | 1天 | |
@@ -26,7 +26,7 @@
 | 12 | 测试 — 单元测试 + 集成测试 | 🔲 | #7 | 2天 | |
 | 13 | 端到端联调 — 钉钉群实测 | 🔲 | #8,#10,#11,#12 | 2-3天 | |
 
-**总进度**: 5/13 完成 · 0 进行中 · 1 被阻塞 (#5) · 7 可开始 · 0 取消  
+**总进度**: 6/13 完成 · 0 进行中 · 0 被阻塞 · 7 可开始 · 0 取消  
 **总计预估**: 15-20 个工作日
 
 > 开发时按状态列更新：完成的任务改为 ✅，开始做的改为 🔄，被阻塞的保持 ⏳，可以开始但还没做的保持 🔲
@@ -77,7 +77,7 @@
 | **第一批** | #1 项目骨架 → #2 Domain 层 | 无，串行 | 1-2 天 | ✅ ✅ |
 | **第二批** | #3 LLM + #5 Parser + #6 基础设施 | #3、#5、#6 三个可并行 | 3-4 天 | ✅ 🔲 ✅ |
 | **第三批** | #4 RAG 模块 | 等 #3 完成后开始 | 2-3 天 | ✅ |
-| **第四批** | #7 Services 层 | 等 #3 #4 #5 #6 全完成 | 2 天 | 🔲 (等待 #5) |
+| **第四批** | #7 Services 层 | 等 #3 #4 #5 #6 全完成 | 2 天 | ✅ (通过可选注入解除 #5 阻塞) |
 | **第五批** | #8 Bot + #9 Analyzer + #10 API + #11 脚本 | 部分可并行 | 3-4 天 | 🔲 🔲 🔲 🔲 |
 | **第六批** | #12 测试 | 与第五批同步进行 | 2 天 | 🔲 |
 | **第七批** | #13 端到端联调 | 全部完成后 | 2-3 天 | 🔲 |
@@ -301,12 +301,12 @@
 
 ---
 
-### ⏳ #7 Services 层 — QA 问答服务 + 知识库管理 + 分析汇总
+### ✅ #7 Services 层 — QA 问答服务 + 知识库管理 + 分析汇总
 
 | 属性 | 值 |
 |------|-----|
-| **状态** | ⏳ 被阻塞 (等待 #3, #4, #5, #6) |
-| **阻塞依赖** | #3, #4, #5, #6 |
+| **状态** | ✅ 已完成 |
+| **阻塞依赖** | #3, #4, #5, #6（#5 通过 Protocol 可选注入解除阻塞） |
 | **预估时间** | 2 天 |
 | **交付路径** | `src/services/` |
 
@@ -315,27 +315,43 @@
 **问答服务** (`src/services/qa_service.py`):
 - QAService 类 — 核心业务编排
 - ask() 方法完整流程：
-  1. 获取会话上下文（SessionManager）
-  2. 问题分类（Analyzer）
-  3. RAG 检索（RAGPipeline）
-  4. Prompt 组装（ContextAssembler）
-  5. LLM 生成（OllamaClient）
-  6. 回答后处理（格式化、引用标注）
-  7. 记录问答日志（QuestionRepository）
+  1. 问题验证（空值/超长校验）
+  2. 获取会话上下文（通过可选 SessionManager Protocol）
+  3. 问题分类（通过可选 Classifier Protocol）
+  4. RAG 检索（RAGPipeline）
+  5. Prompt 组装（内置于 RAG 管道的 ContextAssembler）
+  6. LLM 生成（OllamaClient）
+  7. 回答后处理（去 <think> 标签、统一编号格式）
+  8. 记录问答日志（QuestionRepository）
 - 标准操作类：temperature=0.3，阈值>0.8
 - 灵活推理类：temperature=0.7，阈值>0.6
+- 容错设计：KnowledgeNotFoundError 生成友好提示、LLM 异常兜底返回 ERROR 状态答案
+- 置信度计算：基于检索文档数量和分类动态调整
 
 **知识库管理服务** (`src/services/knowledge_service.py`):
 - KnowledgeService 类
-- build_from_code(): 调用 Parser 解析 → LLM 丰富 → 向量化入库
+- build_from_code(): 调用 Parser 解析结果 → LLM 丰富（build_enrichment_prompt） → 向量化（EmbeddingService） → 写入 ChromaDB + SQLite
 - import_document(): 导入手动文档
-- get_stats(): 知识库统计
+- import_from_file(): 从 Markdown/纯文本文件导入，支持自动分块
+- import_from_directory(): 批量导入目录
+- get_stats(): 知识库统计（合并向量库 + SQLite）
+- get_knowledge_items() / delete_knowledge() / get_pages(): 完整 CRUD
+- _split_content(): 长文档按段落/句号自动分块
 
 **分析汇总服务** (`src/services/analytics_service.py`):
 - AnalyticsService 类
-- get_summary(): 问题分类统计
-- get_top_questions(): 高频问题
-- generate_daily_report(): 生成日报
+- get_summary(): 问题分类统计 + 平均置信度 + 成功率
+- get_top_questions(): 高频问题 TOP N
+- get_unanswered(): 知识库盲区分析
+- generate_daily_report(): 生成 Markdown 格式日报/周报
+- save_daily_summary(): 持久化到 daily_summary 表
+
+**模块导出** (`src/services/__init__.py`):
+- 导出 QAService、KnowledgeService、AnalyticsService 及对应异常类
+
+**设计说明**：
+- 通过 Protocol 定义 Classifier、SessionManager 可选依赖，不硬依赖尚未完成的 parser/ 和 analyzer/ 模块
+- Bot 模块完成后可注入 SessionManager，Analyzer 模块完成后可注入 Classifier，无缝集成
 
 ---
 

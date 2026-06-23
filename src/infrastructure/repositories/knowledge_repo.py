@@ -4,6 +4,7 @@
 """
 
 import json
+import sqlite3
 from datetime import datetime
 
 from loguru import logger
