@@ -19,14 +19,14 @@
 | 5 | Parser 模块 — Vue 2 代码解析器 | ✅ | #2 | 3-4天 | 已完成 |
 | 6 | Infrastructure 层 — SQLite + Repository | ✅ | #2 | 1-2天 | 已完成 |
 | 7 | Services 层 — QA/知识库/分析服务 | ✅ | #3,#4,#5,#6 | 2天 | 已完成（通过 Protocol 可选注入 Parser/Analyzer） |
-| 8 | Bot 模块 — 钉钉 Stream 消息收发 | 🔲 | #7 | 2-3天 | |
+| 8 | Bot 模块 — 钉钉 Stream 消息收发 | ✅ | #7 | 2-3天 | 已完成（含会话管理/消息处理器/发送器/Stream连接） |
 | 9 | Analyzer 模块 — 分类/汇总/日报 | 🔲 | #2, #6 | 1-2天 | |
 | 10 | API 层 — FastAPI 路由 + 启动入口 | 🔲 | #7, #8 | 1天 | |
 | 11 | 脚本开发 — 知识库构建/导入脚本 | 🔲 | #4, #5, #6 | 1天 | |
 | 12 | 测试 — 单元测试 + 集成测试 | 🔲 | #7 | 2天 | |
 | 13 | 端到端联调 — 钉钉群实测 | 🔲 | #8,#10,#11,#12 | 2-3天 | |
 
-**总进度**: 7/13 完成 · 0 进行中 · 0 被阻塞 · 6 可开始 · 0 取消  
+**总进度**: 8/13 完成 · 0 进行中 · 0 被阻塞 · 5 可开始 · 0 取消  
 **总计预估**: 15-20 个工作日
 
 > 开发时按状态列更新：完成的任务改为 ✅，开始做的改为 🔄，被阻塞的保持 ⏳，可以开始但还没做的保持 🔲
@@ -78,7 +78,7 @@
 | **第二批** | #3 LLM + #5 Parser + #6 基础设施 | #3、#5、#6 三个可并行 | 3-4 天 | ✅ ✅ ✅ |
 | **第三批** | #4 RAG 模块 | 等 #3 完成后开始 | 2-3 天 | ✅ |
 | **第四批** | #7 Services 层 | 等 #3 #4 #5 #6 全完成 | 2 天 | ✅ (通过可选注入解除 #5 阻塞) |
-| **第五批** | #8 Bot + #9 Analyzer + #10 API + #11 脚本 | 部分可并行 | 3-4 天 | 🔲 🔲 🔲 🔲 |
+| **第五批** | #8 Bot + #9 Analyzer + #10 API + #11 脚本 | 部分可并行 | 3-4 天 | ✅ 🔲 🔲 🔲 |
 | **第六批** | #12 测试 | 与第五批同步进行 | 2 天 | 🔲 |
 | **第七批** | #13 端到端联调 | 全部完成后 | 2-3 天 | 🔲 |
 
@@ -355,11 +355,11 @@
 
 ---
 
-### ⏳ #8 Bot 模块 — 钉钉 Stream 消息收发 + 会话管理
+### ✅ #8 Bot 模块 — 钉钉 Stream 消息收发 + 会话管理
 
 | 属性 | 值 |
 |------|-----|
-| **状态** | ⏳ 被阻塞 (等待 #7) |
+| **状态** | ✅ 已完成 |
 | **阻塞依赖** | #7 |
 | **预估时间** | 2-3 天 |
 | **交付路径** | `src/bot/` |
@@ -368,29 +368,53 @@
 
 **Stream 连接管理** (`src/bot/router.py`):
 - BotRouter 类
-- 初始化 dingtalk-stream 客户端
-- 自动重连机制
-- 注册消息回调
+- ✅ 初始化 dingtalk-stream 客户端
+- ✅ 自动重连机制（指数退避策略，最大延迟 300s）
+- ✅ 注册消息回调
+- ✅ 优雅关闭
 
 **消息处理器** (`src/bot/handler.py`):
 - BotHandler 类
-- 检测 @提及
-- 提取问题文本（去除 @部分）
-- 去重检查（消息ID）
-- 异步调用 QAService
-- 异常兜底（回复 "暂时无法回答"）
+- ✅ 检测 @提及
+- ✅ 提取问题文本（去除 @部分）
+- ✅ 去重检查（消息 ID，保留最近 1000 条）
+- ✅ 限流检查（同一用户 60 秒内限流）
+- ✅ 异步调用 QAService
+- ✅ 即时回复 "正在思考..." 反馈
+- ✅ 异常兜底（LLM 错误/处理错误/未知错误分级处理）
+- ✅ 会话历史自动维护
 
 **消息发送** (`src/bot/sender.py`):
-- MessageSender 类，实现 domain/ports.py 中的 MessageSender 接口
-- send_text(): 发送纯文本
-- send_markdown(): 发送 Markdown 格式
-- update_message(): 更新已发送消息（先回 "思考中..." 再更新为最终答案）
+- DingTalkMessageSender 类，实现 domain/ports.py 中的 MessageSender 接口
+- ✅ send_text(): 发送纯文本
+- ✅ send_markdown(): 发送 Markdown 格式
+- ✅ update_message(): 更新已发送消息（支持撤回重发回退）
+- ✅ send_thinking_hint(): 即时反馈
+- ✅ send_error_message(): 错误提示
+- ✅ 消息注册表（维护 message_id 到会话的映射）
 
 **会话管理** (`src/bot/session.py`):
 - SessionManager 类
-- 维护每个会话的对话历史（最近 N 轮）
-- LRU 淘汰过期会话（TTL 5分钟）
-- 线程安全
+- ✅ 维护每个会话的对话历史（最近 N 轮）
+- ✅ LRU 淘汰过期会话（可配置 max_sessions）
+- ✅ TTL 过期（默认 5 分钟）
+- ✅ 线程安全（threading.Lock）
+- ✅ 消息溢出保护（超过 max_history*2 时自动截断）
+- ✅ 统计接口（get_stats）
+
+**模块导出** (`src/bot/__init__.py`):
+- ✅ 导出 BotRouter、BotHandler、DingTalkMessageSender、SessionManager
+
+**测试** (`tests/unit/test_bot/`):
+- ✅ 73 个单元测试全部通过
+- ✅ 覆盖: session(17)、sender(14)、handler(26)、router(12)、模块导出(4)
+- ✅ 全部 144 个测试无回归
+
+**设计说明**：
+- SessionManager 实现 qa_service.py 中定义的 SessionManager Protocol，可直接注入 QAService
+- DingTalkMessageSender 实现 domain/ports.py 中的 MessageSender Protocol
+- BotHandler 支持完整容错: 即使 "思考中" 提示发送失败也不影响主回答流程
+- BotRouter 重连策略: 指数退避（base_delay * 2^count，最大 300s），可配置最大重试次数
 
 ---
 
