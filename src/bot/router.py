@@ -166,9 +166,9 @@ class BotRouter:
                     self._reconnect_count + 1,
                 )
 
-                # start_forever 是阻塞调用，在线程中运行
-                # 如果它返回说明连接断开了
-                self._stream_client.start_forever()
+                # start_forever 是阻塞调用，使用 asyncio.to_thread 在线程池中运行，
+                # 避免阻塞 asyncio 事件循环导致 FastAPI 等其他协outine 无法执行。
+                await asyncio.to_thread(self._stream_client.start_forever)
 
                 # 如果正常退出
                 if not self._running:

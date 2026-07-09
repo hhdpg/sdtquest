@@ -206,7 +206,7 @@ def create_services(infra: dict) -> dict:
 # DingTalk Bot 启动
 # ============================================================================
 
-async def start_dingtalk_bot(services: dict, infra: dict) -> object | None:
+async def start_dingtalk_bot(services: dict, infra: dict) -> tuple[object | None, asyncio.Task | None]:
     """
     启动钉钉机器人（如果配置了凭证）。
 
@@ -217,12 +217,12 @@ async def start_dingtalk_bot(services: dict, infra: dict) -> object | None:
         infra: 基础设施实例字典
 
     Returns:
-        BotRouter 实例（如果启动成功），否则返回 None
+        (BotRouter 实例, 后台任务) 元组；启动失败时对应位置为 None
     """
     # 检查是否配置了钉钉凭证
     if not settings.DINGTALK_APP_KEY or not settings.DINGTALK_APP_SECRET:
         logger.warning("钉钉凭证未配置，跳过机器人启动")
-        return None
+        return None, None
 
     try:
         from src.bot.handler import BotHandler
@@ -253,17 +253,31 @@ async def start_dingtalk_bot(services: dict, infra: dict) -> object | None:
         )
 
         # 在后台任务中启动 Stream 连接
-        asyncio.create_task(bot_router.start())
+        bot_task = asyncio.create_task(bot_router.start())
+
+        def _on_bot_task_done(task: asyncio.Task) -> None:
+            """Bot 后台任务完成回调，捕获并记录异常，避免静默吞掉错误"""
+            if task.cancelled():
+                logger.info("钉钉机器人任务已取消")
+            elif task.exception() is not None:
+                logger.error(
+                    "钉钉机器人后台任务异常 | error={}",
+                    task.exception(),
+                )
+            else:
+                logger.warning("钉钉机器人 Stream 任务已结束（非预期）")
+
+        bot_task.add_done_callback(_on_bot_task_done)
         logger.info("钉钉机器人已在后台启动")
 
-        return bot_router
+        return bot_router, bot_task
 
     except ImportError as e:
         logger.warning("钉钉相关依赖未安装，跳过机器人启动: {}", e)
-        return None
+        return None, None
     except Exception as e:
         logger.error("钉钉机器人启动失败: {}", e)
-        return None
+        return None, None
 
 
 # ============================================================================
@@ -356,7 +370,7 @@ async def lifespan(app):
     services = create_services(infra)
 
     # 启动钉钉机器人
-    bot_router = await start_dingtalk_bot(services, infra)
+    bot_router, bot_task = await start_dingtalk_bot(services, infra)
 
     # 设置定时任务
     scheduler = setup_scheduler(services)
@@ -366,6 +380,7 @@ async def lifespan(app):
     app.state.knowledge_service = services["knowledge_service"]
     app.state.analytics_service = services["analytics_service"]
     app.state.bot_router = bot_router
+    app.state.bot_task = bot_task
     app.state.session_manager = getattr(services["qa_service"], "session_manager", None)
     app.state.infra = infra
     app.state.services = services
@@ -381,6 +396,17 @@ async def lifespan(app):
     # 关闭钉钉机器人
     if bot_router is not None:
         await bot_router.stop()
+
+    # 等待 bot 后台任务结束（stop() 会触发 disconnect，使 start_forever 返回）
+    if bot_task is not None:
+        try:
+            await asyncio.wait_for(bot_task, timeout=5.0)
+        except asyncio.TimeoutError:
+            logger.warning("钉钉机器人任务未在 5s 内结束，取消中...")
+            bot_task.cancel()
+        except Exception as e:
+            # 异常已由 done_callback 记录，此处忽略 CancelledError 等
+            logger.debug("等待 bot 任务结束 | result={}", type(e).__name__)
 
     # 关闭调度器
     if scheduler is not None:

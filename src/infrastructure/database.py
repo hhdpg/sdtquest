@@ -66,6 +66,15 @@ class DatabaseManager:
             )
             # 设置行工厂，返回字典格式
             self.conn.row_factory = sqlite3.Row
+
+            # ── 并发访问优化 ──
+            # WAL 模式: 允许读写并发（多读 + 一写），避免默认 rollback journal
+            # 模式下"读阻塞写、写阻塞读"的问题。适合问答记录与定时汇总并发写入场景。
+            self.conn.execute("PRAGMA journal_mode=WAL")
+            # busy_timeout: 遇到锁时等待指定毫秒数再报错，而非立即抛出
+            # "database is locked"。5 秒对大多数并发场景足够。
+            self.conn.execute("PRAGMA busy_timeout=5000")
+
             logger.debug("数据库连接已创建 | db_path={}", self.db_path)
 
         return self.conn
