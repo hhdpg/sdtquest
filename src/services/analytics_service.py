@@ -270,26 +270,19 @@ class AnalyticsService:
 
             import json
 
+            top_json = json.dumps(
+                top_questions, ensure_ascii=False, default=str
+            )
+
+            # 通过 Repository 方法写入，避免直接访问 db 连接（分层违规）
             for category_value, count in summary["by_category"].items():
-                top_json = json.dumps(
-                    top_questions, ensure_ascii=False, default=str
+                self.question_repo.save_daily_summary(
+                    date_str=today,
+                    category=category_value,
+                    question_count=count,
+                    top_questions_json=top_json,
                 )
 
-                # 使用 UPSERT 确保幂等
-                self.question_repo.db.execute(
-                    """
-                    INSERT INTO daily_summary
-                    (date, category, question_count, top_questions)
-                    VALUES (?, ?, ?, ?)
-                    ON CONFLICT(date, category)
-                    DO UPDATE SET
-                        question_count = excluded.question_count,
-                        top_questions = excluded.top_questions
-                    """,
-                    (today, category_value, count, top_json),
-                )
-
-            self.question_repo.db.commit()
             logger.info("每日汇总已保存 | date={} | categories={}", today, len(summary["by_category"]))
 
         except Exception as e:

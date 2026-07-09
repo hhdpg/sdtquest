@@ -201,8 +201,8 @@ class SQLiteQuestionRepository:
                     cutoff.isoformat(),
                     AnswerStatus.NO_MATCH.value,
                     AnswerStatus.ERROR.value,
+                    limit,
                 ),
-                limit,
             )
 
             results = []
@@ -285,6 +285,46 @@ class SQLiteQuestionRepository:
         except Exception as e:
             logger.error("统计问题总数失败 | error={}", str(e))
             return 0
+
+    def save_daily_summary(
+        self,
+        date_str: str,
+        category: str,
+        question_count: int,
+        top_questions_json: str,
+    ) -> None:
+        """
+        保存每日汇总数据到 daily_summary 表
+
+        使用 UPSERT 确保幂等，相同 (date, category) 会覆盖原有记录。
+
+        Args:
+            date_str: 日期字符串 (YYYY-MM-DD)
+            category: 问题分类枚举值
+            question_count: 该分类的问题数量
+            top_questions_json: 高频问题 JSON 字符串
+        """
+        try:
+            self.db.execute(
+                """
+                INSERT INTO daily_summary
+                (date, category, question_count, top_questions)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(date, category)
+                DO UPDATE SET
+                    question_count = excluded.question_count,
+                    top_questions = excluded.top_questions
+                """,
+                (date_str, category, question_count, top_questions_json),
+            )
+            self.db.commit()
+            logger.debug(
+                "每日汇总已保存 | date={} | category={} | count={}",
+                date_str, category, question_count,
+            )
+        except Exception as e:
+            logger.error("保存每日汇总失败 | error={}", str(e))
+            raise
 
     def _row_to_question_answer(
         self,

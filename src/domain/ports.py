@@ -237,6 +237,26 @@ class QuestionRepository(Protocol):
         """
         ...
 
+    def save_daily_summary(
+        self,
+        date_str: str,
+        category: str,
+        question_count: int,
+        top_questions_json: str,
+    ) -> None:
+        """
+        保存每日汇总数据到 daily_summary 表
+
+        使用 UPSERT 确保幂等，相同 (date, category) 会覆盖原有记录。
+
+        Args:
+            date_str: 日期字符串 (YYYY-MM-DD)
+            category: 问题分类枚举值
+            question_count: 该分类的问题数量
+            top_questions_json: 高频问题 JSON 字符串
+        """
+        ...
+
 
 # ============================================================================
 # 消息发送接口
