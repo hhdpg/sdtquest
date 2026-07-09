@@ -155,6 +155,12 @@ def create_services(infra: dict) -> dict:
     rag_pipeline = RAGPipeline()
     logger.info("RAG 管道初始化完成")
 
+    # ── 问题分类器 ──
+    from src.analyzer.classifier import QuestionClassifier
+
+    classifier = QuestionClassifier()
+    logger.info("问题分类器初始化完成")
+
     # ── QAService ──
     from src.services.qa_service import QAService
 
@@ -162,7 +168,7 @@ def create_services(infra: dict) -> dict:
         llm=llm_client,
         rag_pipeline=rag_pipeline,
         question_repo=infra["question_repo"],
-        classifier=None,  # 分类器待 Analyzer 模块完成后注入
+        classifier=classifier,  # 注入问题分类器
         session_manager=None,  # 会话管理器待 Bot 模块完成后注入
     )
     logger.info("QAService 初始化完成")
