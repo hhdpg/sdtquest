@@ -21,12 +21,12 @@
 | 7 | Services 层 — QA/知识库/分析服务 | ✅ | #3,#4,#5,#6 | 2天 | 已完成（通过 Protocol 可选注入 Parser/Analyzer） |
 | 8 | Bot 模块 — 钉钉 Stream 消息收发 | ✅ | #7 | 2-3天 | 已完成（含会话管理/消息处理器/发送器/Stream连接） |
 | 9 | Analyzer 模块 — 分类/汇总/日报 | 🔲 | #2, #6 | 1-2天 | |
-| 10 | API 层 — FastAPI 路由 + 启动入口 | 🔲 | #7, #8 | 1天 | |
+| 10 | API 层 — FastAPI 路由 + 启动入口 | ✅ | #7, #8 | 1天 | 已完成（含 FastAPI 应用/依赖注入/4个路由模块/完整启动入口） |
 | 11 | 脚本开发 — 知识库构建/导入脚本 | 🔲 | #4, #5, #6 | 1天 | |
 | 12 | 测试 — 单元测试 + 集成测试 | 🔲 | #7 | 2天 | |
 | 13 | 端到端联调 — 钉钉群实测 | 🔲 | #8,#10,#11,#12 | 2-3天 | |
 
-**总进度**: 8/13 完成 · 0 进行中 · 0 被阻塞 · 5 可开始 · 0 取消  
+**总进度**: 9/13 完成 · 0 进行中 · 0 被阻塞 · 4 可开始 · 0 取消  
 **总计预估**: 15-20 个工作日
 
 > 开发时按状态列更新：完成的任务改为 ✅，开始做的改为 🔄，被阻塞的保持 ⏳，可以开始但还没做的保持 🔲
@@ -78,7 +78,7 @@
 | **第二批** | #3 LLM + #5 Parser + #6 基础设施 | #3、#5、#6 三个可并行 | 3-4 天 | ✅ ✅ ✅ |
 | **第三批** | #4 RAG 模块 | 等 #3 完成后开始 | 2-3 天 | ✅ |
 | **第四批** | #7 Services 层 | 等 #3 #4 #5 #6 全完成 | 2 天 | ✅ (通过可选注入解除 #5 阻塞) |
-| **第五批** | #8 Bot + #9 Analyzer + #10 API + #11 脚本 | 部分可并行 | 3-4 天 | ✅ 🔲 🔲 🔲 |
+| **第五批** | #8 Bot + #9 Analyzer + #10 API + #11 脚本 | 部分可并行 | 3-4 天 | ✅ 🔲 ✅ 🔲 |
 | **第六批** | #12 测试 | 与第五批同步进行 | 2 天 | 🔲 |
 | **第七批** | #13 端到端联调 | 全部完成后 | 2-3 天 | 🔲 |
 
@@ -452,11 +452,11 @@
 
 ---
 
-### ⏳ #10 API 层 — FastAPI 路由 + 应用启动入口
+### ✅ #10 API 层 — FastAPI 路由 + 应用启动入口
 
 | 属性 | 值 |
 |------|-----|
-| **状态** | ⏳ 被阻塞 (等待 #7, #8) |
+| **状态** | ✅ 已完成 |
 | **阻塞依赖** | #7, #8 |
 | **预估时间** | 1 天 |
 | **交付路径** | `src/api/`, `src/main.py` |
@@ -464,29 +464,45 @@
 **任务内容**：
 
 **FastAPI 应用** (`src/api/app.py`):
-- 创建 FastAPI 实例
-- 注册所有路由
-- 全局异常处理（捕获 AppException，返回统一错误格式）
-- CORS 配置
+- ✅ 创建 FastAPI 实例
+- ✅ 注册所有路由
+- ✅ 全局异常处理（捕获 AppException，返回统一错误格式）
+- ✅ CORS 配置
+- ✅ 请求日志中间件
 
 **依赖注入** (`src/api/deps.py`):
-- 从 app.state 获取 service 实例
-- 提供 get_qa_service()、get_knowledge_service() 等依赖函数
+- ✅ 从 app.state 获取 service 实例
+- ✅ 提供 get_qa_service()、get_knowledge_service()、get_analytics_service() 等依赖函数
 
 **API 路由** (`src/api/routes/`):
-- `health.py` — GET /health 健康检查
-- `chat.py` — POST /api/chat 调试用对话接口
-- `knowledge.py` — POST /api/knowledge/build 触发构建、GET /api/knowledge/stats 统计
-- `analytics.py` — GET /api/analytics/summary、GET /api/analytics/top-questions
+- ✅ `health.py` — GET /health 健康检查、GET /health/detailed 详细健康检查
+- ✅ `chat.py` — POST /api/chat 调试用对话接口、POST /api/chat/simple 简化接口
+- ✅ `knowledge.py` — POST /api/knowledge/build 触发构建、GET /api/knowledge/stats 统计、GET /api/knowledge/items 查询、DELETE /api/knowledge/items/{item_id} 删除、POST /api/knowledge/import 导入
+- ✅ `analytics.py` — GET /api/analytics/summary 统计摘要、GET /api/analytics/top-questions 高频问题、GET /api/analytics/unanswered 未回答问题、GET /api/analytics/report 生成报告、POST /api/analytics/report/save 保存报告
 
 **应用启动入口** (`src/main.py`):
-- 完善启动逻辑：
-  1. 加载配置
-  2. 初始化基础设施（SQLite、ChromaDB）
-  3. 创建服务实例（QAService、KnowledgeService、AnalyticsService）
-  4. 启动 FastAPI（uvicorn）
-  5. 启动 DingTalk Stream（异步任务）
-  6. 注册定时任务（每日汇总）
+- ✅ 完善启动逻辑：
+  1. ✅ 加载配置
+  2. ✅ 初始化基础设施（SQLite、ChromaDB）
+  3. ✅ 创建服务实例（QAService、KnowledgeService、AnalyticsService）
+  4. ✅ 启动 FastAPI（uvicorn）
+  5. ✅ 启动 DingTalk Stream（异步任务）
+  6. ✅ 注册定时任务（每日汇总）
+
+**交付清单**:
+- `src/api/app.py` — FastAPI 应用工厂（创建应用、配置CORS、异常处理、路由注册）
+- `src/api/deps.py` — 依赖注入函数（从 app.state 获取服务实例）
+- `src/api/routes/health.py` — 健康检查路由（2个接口）
+- `src/api/routes/chat.py` — 对话路由（2个接口）
+- `src/api/routes/knowledge.py` — 知识库路由（6个接口）
+- `src/api/routes/analytics.py` — 统计分析路由（5个接口）
+- `src/main.py` — 应用启动入口（完整的生命周期管理）
+
+**测试验证**:
+- ✅ 所有模块导入成功
+- ✅ FastAPI 应用创建成功
+- ✅ 15个API路由正确注册
+- ✅ 144个单元测试全部通过（无回归）
 
 ---
 
