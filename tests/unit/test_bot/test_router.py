@@ -167,6 +167,63 @@ class TestBotRouter:
         # 确认代码引用的类可被导入
         import src.bot.router  # noqa: F401
 
+    def test_parse_callback_from_real_callback_message(self, router: BotRouter) -> None:
+        """必须能从 SDK 真实传递的 CallbackMessage 中解析出业务字段
+
+        回归保护: SDK 的 route_message 传给 handler.process 的是
+        CallbackMessage，业务数据封装在 .data 中，而非直接挂在对象上。
+        旧实现直接 getattr(callback, "conversation_id") 拿到全空值，
+        导致群里发消息后机器人收不到任何有效内容、也不回复。
+        """
+        import json
+
+        from dingtalk_stream import CallbackMessage
+
+        raw = {
+            "specVersion": "1.0",
+            "type": "CALLBACK",
+            "headers": {
+                "topic": "/v1.0/im/bot/messages/get",
+                "contentType": "application/json",
+                "messageId": "stream_msg_1",
+            },
+            "data": json.dumps({
+                "conversationId": "cid_real_123",
+                "senderId": "user_real_456",
+                "senderNick": "张三",
+                "msgId": "msg_real_789",
+                "conversationType": "2",
+                "chatbotUserId": "bot_1",
+                "isInAtList": True,
+                "sessionWebhook": "https://oapi.dingtalk.com/robot/sendBySession?session=abc",
+                "sessionWebhookExpiredTime": 9999999999999,
+                "text": {"content": " 怎么下单"},
+                "msgtype": "text",
+                "robotCode": "dingsh",
+            }),
+        }
+        callback = CallbackMessage.from_dict(raw)
+
+        parsed = router._parse_callback(callback)
+
+        assert parsed["conversation_id"] == "cid_real_123"
+        assert parsed["sender_id"] == "user_real_456"
+        assert parsed["sender_nick"] == "张三"
+        assert parsed["text"] == " 怎么下单"
+        assert parsed["message_id"] == "msg_real_789"
+        assert parsed["is_in_at_list"] is True
+        assert parsed["session_webhook"].endswith("session=abc")
+
+    def test_parse_callback_unparseable_returns_empty(self, router: BotRouter) -> None:
+        """无法解析的回调应返回空字段而非抛异常"""
+        callback = MagicMock(spec=["data"])
+        callback.data = None
+
+        parsed = router._parse_callback(callback)
+
+        assert parsed["conversation_id"] == ""
+        assert parsed["text"] == ""
+
     # ====================================================================
     # 停止
     # ====================================================================

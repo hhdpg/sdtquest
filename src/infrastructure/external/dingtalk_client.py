@@ -99,6 +99,7 @@ class DingTalkClient:
         open_conversation_id: str,
         content: str,
         at_user_ids: list[str] | None = None,
+        at_names: list[str] | None = None,
     ) -> str:
         """
         发送纯文本消息
@@ -106,7 +107,8 @@ class DingTalkClient:
         Args:
             open_conversation_id: 会话 ID
             content: 文本内容
-            at_user_ids: 需要 @ 的用户 ID 列表
+            at_user_ids: 需要 @ 的用户 ID 列表（用于触发提醒）
+            at_names: 与 at_user_ids 对应的显示姓名；未提供时用 ID 兜底
 
         Returns:
             消息 ID
@@ -116,10 +118,10 @@ class DingTalkClient:
         """
         msg_content: dict[str, Any] = {"content": content}
         if at_user_ids:
-            # 纯文本消息中 @ 用户需要在正文写 @userId，并声明 atUserIds
-            msg_content["content"] = (
-                "".join(f"@{uid} " for uid in at_user_ids) + content
-            )
+            # 正文用姓名展示（避免出现工号/加密 ID），atUserIds 仍用工号触发提醒
+            msg_content["content"] = self._format_at_prefix(
+                at_user_ids, at_names
+            ) + content
             msg_content["atUserIds"] = at_user_ids
 
         return await self._send_message(
@@ -135,6 +137,7 @@ class DingTalkClient:
         title: str,
         text: str,
         at_user_ids: list[str] | None = None,
+        at_names: list[str] | None = None,
     ) -> str:
         """
         发送 Markdown 格式消息
@@ -143,7 +146,8 @@ class DingTalkClient:
             open_conversation_id: 会话 ID
             title: 消息标题
             text: Markdown 内容
-            at_user_ids: 需要 @ 的用户 ID 列表
+            at_user_ids: 需要 @ 的用户 ID 列表（用于触发提醒）
+            at_names: 与 at_user_ids 对应的显示姓名；未提供时用 ID 兜底
 
         Returns:
             消息 ID
@@ -153,10 +157,10 @@ class DingTalkClient:
         """
         msg_content: dict[str, Any] = {"title": title, "text": text}
         if at_user_ids:
-            # Markdown 消息中 @ 用户需要在正文写 @userId，并声明 atUserIds
-            msg_content["text"] = (
-                "".join(f"@{uid} " for uid in at_user_ids) + text
-            )
+            # 正文用姓名展示（避免出现工号/加密 ID），atUserIds 仍用工号触发提醒
+            msg_content["text"] = self._format_at_prefix(
+                at_user_ids, at_names
+            ) + text
             msg_content["atUserIds"] = at_user_ids
 
         return await self._send_message(
@@ -165,6 +169,32 @@ class DingTalkClient:
             msg_content=msg_content,
             at_user_ids=at_user_ids,
         )
+
+    def _format_at_prefix(
+        self,
+        at_user_ids: list[str],
+        at_names: list[str] | None = None,
+    ) -> str:
+        """
+        生成正文中的 @ 前缀。
+
+        钉钉消息中 @ 的提醒由 atUserIds 字段触发；正文里的 @xxx 只是展示文本。
+        若直接写 @工号 会显示成 "01415465" 这种工号，观感差。
+        因此这里优先用姓名展示，无姓名时回退为 ID。
+
+        Args:
+            at_user_ids: 用户 ID 列表
+            at_names: 与 ID 对应的显示姓名
+
+        Returns:
+            形如 "@张三 @李四 " 的前缀字符串
+        """
+        names = at_names or []
+        parts = []
+        for idx, uid in enumerate(at_user_ids):
+            display = names[idx] if idx < len(names) and names[idx] else uid
+            parts.append(f"@{display} ")
+        return "".join(parts)
 
     async def reply_by_webhook(
         self,

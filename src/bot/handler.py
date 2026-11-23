@@ -131,6 +131,8 @@ class BotHandler:
         # 提取消息字段
         conversation_id = message_data.get("conversation_id", "")
         sender_id = message_data.get("sender_id", "")
+        # 用于 @ 的真实 userId（staffId）；sender_id 是加密 openId，不能用于 @
+        sender_staff_id = message_data.get("sender_staff_id", "")
         sender_nick = message_data.get("sender_nick", "")
         raw_text = message_data.get("text", "")
         message_id = message_data.get("message_id", "")
@@ -211,10 +213,12 @@ class BotHandler:
             )
 
             # ── 7. 发送回答（@提问人）──
+            # 仅当拿到真实 userId(staffId) 时才 @；正文展示昵称，atUserIds 用工号触发提醒
             await self._send_answer(
                 conversation_id=conversation_id,
                 session_webhook=session_webhook,
-                at_user_ids=[sender_id] if sender_id else None,
+                at_user_ids=[sender_staff_id] if sender_staff_id else None,
+                at_names=[sender_nick] if (sender_staff_id and sender_nick) else None,
                 answer=answer,
             )
 
@@ -346,6 +350,7 @@ class BotHandler:
         conversation_id: str,
         session_webhook: str,
         at_user_ids: list[str] | None,
+        at_names: list[str] | None,
         answer: Answer,
     ) -> None:
         """
@@ -361,7 +366,8 @@ class BotHandler:
         Args:
             conversation_id: 会话 ID
             session_webhook: Stream 回调中的 session_webhook（可为空）
-            at_user_ids: 需要 @ 的用户 ID 列表
+            at_user_ids: 需要 @ 的用户 ID 列表（工号，用于触发提醒）
+            at_names: 与 ID 对应的显示姓名（正文展示用）
             answer: 回答对象
         """
         formatted_text = self._format_answer(answer)
@@ -374,6 +380,7 @@ class BotHandler:
                     title="回答",
                     text=formatted_text,
                     at_user_ids=at_user_ids,
+                    at_names=at_names,
                 )
                 logger.debug("已通过 webhook 回复回答 | at_count={}", len(at_user_ids or []))
                 return
@@ -388,6 +395,7 @@ class BotHandler:
             title="回答",
             text=formatted_text,
             at_user_ids=at_user_ids,
+            at_names=at_names,
         )
 
     def _format_answer(self, answer: Answer) -> str:

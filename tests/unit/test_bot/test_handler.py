@@ -78,12 +78,14 @@ class TestBotHandler:
         text: str = "@机器人 如何创建订单?",
         conversation_id: str = "conv_123",
         sender_id: str = "user_456",
+        sender_staff_id: str = "staff_456",
         message_id: str = "msg_789",
     ) -> dict:
         """创建测试消息数据"""
         return {
             "conversation_id": conversation_id,
             "sender_id": sender_id,
+            "sender_staff_id": sender_staff_id,
             "sender_nick": "测试用户",
             "text": text,
             "message_id": message_id,
@@ -198,7 +200,7 @@ class TestBotHandler:
         # 验证发送了回答（无 webhook 时走群发接口），并 @ 提问人
         mock_sender.send_markdown.assert_called_once()
         call_kwargs = mock_sender.send_markdown.call_args.kwargs
-        assert call_kwargs["at_user_ids"] == ["user_456"]
+        assert call_kwargs["at_user_ids"] == ["staff_456"]
         assert call_kwargs["conversation_id"] == "conv_123"
 
     @pytest.mark.asyncio
@@ -401,26 +403,43 @@ class TestBotHandler:
     async def test_reply_at_asker(
         self, handler: BotHandler, mock_qa_service: MagicMock, mock_sender: MagicMock
     ) -> None:
-        """回答时应在 at_user_ids 中包含提问人"""
-        message_data = self._make_message_data(sender_id="user_999")
+        """回答时应在 at_user_ids 中包含提问人的真实 userId（staffId）"""
+        message_data = self._make_message_data(sender_id="user_999", sender_staff_id="staff_999")
         await handler.on_message(message_data)
 
         call_kwargs = mock_sender.send_markdown.call_args.kwargs
-        assert call_kwargs["at_user_ids"] == ["user_999"]
+        assert call_kwargs["at_user_ids"] == ["staff_999"]
+
+    @pytest.mark.asyncio
+    async def test_no_at_when_staff_id_missing(
+        self, handler: BotHandler, mock_qa_service: MagicMock, mock_sender: MagicMock
+    ) -> None:
+        """缺少 staffId 时不应 @ 加密的 openId
+
+        回归保护: sender_id 是钉钉加密 openId（形如 $:LWCP_v1:$...），
+        用于 @ 会在群里显示成一串乱码编码。
+        """
+        message_data = self._make_message_data(
+            sender_id="$:LWCP_v1:$3yhDHFQatM8MPaySaJM", sender_staff_id=""
+        )
+        await handler.on_message(message_data)
+
+        call_kwargs = mock_sender.send_markdown.call_args.kwargs
+        assert call_kwargs["at_user_ids"] is None
 
     @pytest.mark.asyncio
     async def test_uses_webhook_when_available(
         self, handler: BotHandler, mock_qa_service: MagicMock, mock_sender: MagicMock
     ) -> None:
         """存在 session_webhook 时应优先走 webhook 通道，并 @ 提问人"""
-        message_data = self._make_message_data(sender_id="user_999")
+        message_data = self._make_message_data(sender_id="user_999", sender_staff_id="staff_999")
         message_data["session_webhook"] = "https://oapi.dingtalk.com/robot/sendBySession?session=xyz"
 
         await handler.on_message(message_data)
 
         mock_sender.reply_markdown_via_webhook.assert_called_once()
         call_kwargs = mock_sender.reply_markdown_via_webhook.call_args.kwargs
-        assert call_kwargs["at_user_ids"] == ["user_999"]
+        assert call_kwargs["at_user_ids"] == ["staff_999"]
         assert call_kwargs["webhook_url"].endswith("session=xyz")
         # 走 webhook 后不应再走群发接口
         mock_sender.send_markdown.assert_not_called()
@@ -433,13 +452,13 @@ class TestBotHandler:
         mock_sender.reply_markdown_via_webhook = AsyncMock(
             side_effect=Exception("webhook 失效")
         )
-        message_data = self._make_message_data(sender_id="user_999")
+        message_data = self._make_message_data(sender_id="user_999", sender_staff_id="staff_999")
         message_data["session_webhook"] = "https://example.com/sendBySession"
 
         await handler.on_message(message_data)
 
         mock_sender.send_markdown.assert_called_once()
-        assert mock_sender.send_markdown.call_args.kwargs["at_user_ids"] == ["user_999"]
+        assert mock_sender.send_markdown.call_args.kwargs["at_user_ids"] == ["staff_999"]
 
     @pytest.mark.asyncio
     async def test_skip_when_not_at_bot(

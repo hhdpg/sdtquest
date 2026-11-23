@@ -175,6 +175,56 @@ class TestAtUserSupport:
             assert "atUserIds" not in parsed
             assert "atUserIds" not in body
 
+    @pytest.mark.asyncio
+    async def test_at_display_uses_name_not_staff_id(self, client: DingTalkClient):
+        """正文应展示姓名而非工号，atUserIds 仍用工号触发提醒
+
+        回归保护: 曾把 atUserIds 的值直接拼进正文，导致群里显示
+        "@01415465" 这样的工号，观感差。
+        """
+        with patch("src.infrastructure.external.dingtalk_client.httpx.AsyncClient") as mock_cls:
+            mock_cls.return_value.post = AsyncMock(
+                return_value=make_response({"processQueryKey": "mid"})
+            )
+            mock_cls.return_value.__aenter__ = AsyncMock(return_value=mock_cls.return_value)
+            mock_cls.return_value.__aexit__ = AsyncMock(return_value=None)
+            with patch.object(client, "get_access_token", AsyncMock(return_value="tok")):
+                await client.send_markdown(
+                    open_conversation_id="cid",
+                    title="回答",
+                    text="这是答案",
+                    at_user_ids=["01415465"],
+                    at_names=["谢川东"],
+                )
+
+            body = mock_cls.return_value.post.call_args.kwargs["json"]
+            parsed = json.loads(body["msgParam"])
+            # 正文显示姓名
+            assert parsed["text"].startswith("@谢川东")
+            assert "01415465" not in parsed["text"]
+            # atUserIds 仍用工号
+            assert parsed["atUserIds"] == ["01415465"]
+
+    @pytest.mark.asyncio
+    async def test_at_display_falls_back_to_id(self, client: DingTalkClient):
+        """无姓名时正文回退显示 ID"""
+        with patch("src.infrastructure.external.dingtalk_client.httpx.AsyncClient") as mock_cls:
+            mock_cls.return_value.post = AsyncMock(
+                return_value=make_response({"processQueryKey": "mid"})
+            )
+            mock_cls.return_value.__aenter__ = AsyncMock(return_value=mock_cls.return_value)
+            mock_cls.return_value.__aexit__ = AsyncMock(return_value=None)
+            with patch.object(client, "get_access_token", AsyncMock(return_value="tok")):
+                await client.send_text(
+                    open_conversation_id="cid",
+                    content="答案",
+                    at_user_ids=["01415465"],
+                )
+
+            body = mock_cls.return_value.post.call_args.kwargs["json"]
+            parsed = json.loads(body["msgParam"])
+            assert parsed["content"].startswith("@01415465")
+
 
 class TestWebhookReply:
     """session_webhook 回复通道"""

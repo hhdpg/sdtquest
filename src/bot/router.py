@@ -115,11 +115,14 @@ class BotRouter:
             def __init__(self):
                 super().__init__()
 
-            async def process(self, callback: ChatbotMessage):
+            async def process(self, callback):
                 """
                 Stream 回调入口。
 
-                解析消息数据并转发到 BotHandler，
+                注意: SDK 的 route_message 传进来的是 CallbackMessage，
+                业务字段（conversationId/senderId/text 等）封装在其 data 中，
+                需用 ChatbotMessage.from_dict(callback.data) 解析。
+
                 无论处理成功与否都返回 ACK 避免钉钉重试。
                 """
                 try:
@@ -127,10 +130,10 @@ class BotRouter:
                     await router_ref.handler.on_message(message_data)
                     return AckMessage.STATUS_OK, "OK"
                 except Exception as e:
-                    logger.error(
+                    logger.exception(
                         "Stream 消息处理异常 | error={} | msg_id={}",
                         str(e),
-                        getattr(callback, "message_id", "N/A"),
+                        getattr(getattr(callback, "headers", None), "message_id", "N/A"),
                     )
                     # 即使处理失败也返回 OK，避免钉钉反复重试
                     return AckMessage.STATUS_OK, "OK"
@@ -245,39 +248,110 @@ class BotRouter:
         """
         解析 Stream 回调消息为统一的消息数据字典。
 
+        SDK 传给 process() 的是 CallbackMessage，其业务字段在 .data 中，
+        需要先用 ChatbotMessage.from_dict() 转换，才能拿到
+        conversationId / senderId / text 等字段。
+
         Args:
-            callback: dingtalk-stream 的 ChatbotMessage 回调对象
+            callback: dingtalk-stream 的 CallbackMessage
 
         Returns:
             标准化的消息数据字典
         """
+        # 将 CallbackMessage 转成 ChatbotMessage（业务消息）
+        chat = self._to_chatbot_message(callback)
+        if chat is None:
+            logger.warning(
+                "无法从回调中解析 ChatbotMessage | type={}",
+                type(callback).__name__,
+            )
+            return self._empty_message()
+
         # 提取文本内容
         text_content = ""
-        if hasattr(callback, "text") and callback.text is not None:
-            text_content = callback.text.content if hasattr(callback.text, "content") else str(callback.text)
+        if getattr(chat, "text", None) is not None:
+            text_obj = chat.text
+            text_content = (
+                text_obj.content if hasattr(text_obj, "content") else str(text_obj)
+            )
 
         message_data = {
-            "conversation_id": getattr(callback, "conversation_id", ""),
-            "sender_id": getattr(callback, "sender_id", ""),
-            "sender_nick": getattr(callback, "sender_nick", ""),
+            "conversation_id": getattr(chat, "conversation_id", "") or "",
+            # sender_id 是钉钉的加密 openId（形如 $:LWCP_v1:$...），仅用于
+            # 会话追踪与限流，不能用于 @。@ 必须使用真实 userId。
+            "sender_id": getattr(chat, "sender_id", "") or "",
+            # sender_staff_id 才是企业内的真实 userId（staffId），用于 @用户。
+            # 部分场景可能缺失，此时回退为空串（不 @，避免出现加密串）。
+            "sender_staff_id": getattr(chat, "sender_staff_id", "") or "",
+            "sender_nick": getattr(chat, "sender_nick", "") or "",
             "text": text_content,
-            "message_id": getattr(callback, "message_id", ""),
-            "conversation_type": getattr(callback, "conversation_type", ""),
-            "chatbot_user_id": getattr(callback, "chatbot_user_id", ""),
-            "session_webhook": getattr(callback, "session_webhook", ""),
+            "message_id": getattr(chat, "message_id", "") or "",
+            "conversation_type": getattr(chat, "conversation_type", "") or "",
+            "chatbot_user_id": getattr(chat, "chatbot_user_id", "") or "",
+            "session_webhook": getattr(chat, "session_webhook", "") or "",
             "session_webhook_expired_time": getattr(
-                callback, "session_webhook_expired_time", 0
+                chat, "session_webhook_expired_time", 0
             ),
             # is_in_at_list 用于判断消息是否 @ 了机器人；
             # 部分钉钉版本可能缺失该字段，此时为 None，由 handler 决定不拦截。
-            "is_in_at_list": getattr(callback, "is_in_at_list", None),
+            "is_in_at_list": getattr(chat, "is_in_at_list", None),
         }
 
         logger.debug(
-            "解析 Stream 回调 | conversation={} | sender={} | text_len={}",
+            "解析 Stream 回调 | conversation={} | sender={} | text_len={} | at={}",
             message_data["conversation_id"][:20] if message_data["conversation_id"] else "N/A",
             message_data["sender_nick"],
             len(message_data["text"]),
+            message_data["is_in_at_list"],
         )
 
         return message_data
+
+    @staticmethod
+    def _to_chatbot_message(callback: Any) -> Any:
+        """
+        将回调对象转换为 ChatbotMessage。
+
+        Stream SDK 的 route_message 传给 handler 的是 CallbackMessage，
+        业务数据在 .data 字典中。若传入的已经是 ChatbotMessage（例如单测直接
+        构造），则原样返回。
+
+        Args:
+            callback: CallbackMessage 或 ChatbotMessage
+
+        Returns:
+            ChatbotMessage 实例；无法解析时返回 None
+        """
+        from dingtalk_stream import ChatbotMessage
+
+        # 已经是 ChatbotMessage（含 conversation_id 属性）
+        if hasattr(callback, "conversation_id"):
+            return callback
+
+        # CallbackMessage：业务数据在 .data
+        data = getattr(callback, "data", None)
+        if isinstance(data, dict):
+            try:
+                return ChatbotMessage.from_dict(data)
+            except Exception as e:
+                logger.error("ChatbotMessage.from_dict 失败 | error={}", str(e))
+                return None
+
+        return None
+
+    @staticmethod
+    def _empty_message() -> dict[str, Any]:
+        """返回空的消息数据字典（解析失败时兜底）"""
+        return {
+            "conversation_id": "",
+            "sender_id": "",
+            "sender_staff_id": "",
+            "sender_nick": "",
+            "text": "",
+            "message_id": "",
+            "conversation_type": "",
+            "chatbot_user_id": "",
+            "session_webhook": "",
+            "session_webhook_expired_time": 0,
+            "is_in_at_list": None,
+        }

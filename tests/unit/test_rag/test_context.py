@@ -212,3 +212,61 @@ class TestContextAssemblerCategoryCheck:
     def test_is_standard_none(self, assembler):
         """测试 None 不是标准类"""
         assert assembler._is_standard_category(None) is False
+
+
+class TestContextLengthControl:
+    """上下文长度控制测试
+
+    回归保护: RAG prompt 曾达到 13000+ 字符，超过 Ollama 默认 num_ctx(4096)，
+    导致 9B 模型只输出前几个字（如仅"根据"两字）。
+    """
+
+    def test_long_doc_is_truncated(self):
+        """单篇超长文档应被截断"""
+        from src.config import settings
+        from src.rag.context import ContextAssembler
+
+        assembler = ContextAssembler()
+        long_content = "订单流程说明。" * 2000  # 远超单篇上限
+        doc = KnowledgeItem(
+            id="k1", type=KnowledgeType.MANUAL, title="订单",
+            content=long_content,
+        )
+
+        context = assembler._build_knowledge_context([doc])
+
+        assert len(context) <= settings.RAG_MAX_DOC_CHARS + 200  # 留出标题/标签余量
+        assert "内容过长已截断" in context
+
+    def test_total_context_respects_limit(self):
+        """多篇文档合计不应超过总上限"""
+        from src.config import settings
+        from src.rag.context import ContextAssembler
+
+        assembler = ContextAssembler()
+        docs = [
+            KnowledgeItem(
+                id=f"k{i}", type=KnowledgeType.MANUAL, title=f"文档{i}",
+                content="内容" * 900,  # 每篇接近单篇上限
+            )
+            for i in range(10)
+        ]
+
+        context = assembler._build_knowledge_context(docs)
+
+        assert len(context) <= settings.RAG_MAX_CONTEXT_CHARS + 300
+
+    def test_short_docs_not_truncated(self):
+        """短文档应完整保留"""
+        from src.rag.context import ContextAssembler
+
+        assembler = ContextAssembler()
+        doc = KnowledgeItem(
+            id="k1", type=KnowledgeType.MANUAL, title="订单",
+            content="订单创建流程：先校验再入库。",
+        )
+
+        context = assembler._build_knowledge_context([doc])
+
+        assert "订单创建流程：先校验再入库。" in context
+        assert "已截断" not in context

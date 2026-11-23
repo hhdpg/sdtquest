@@ -96,6 +96,10 @@ class OllamaClient:
                         "temperature": opts.temperature,
                         "num_predict": opts.max_tokens,
                         "top_p": opts.top_p,
+                        # 显式设置上下文窗口。Ollama 默认 num_ctx=4096，
+                        # 而 RAG 的 prompt 常超过该值，超出后模型会截断输出
+                        # （表现为只回复几个字）。这里按配置放大窗口。
+                        "num_ctx": settings.LLM_CONTEXT_WINDOW,
                     },
                 }
 
@@ -187,6 +191,7 @@ class OllamaClient:
                         "temperature": opts.temperature,
                         "num_predict": opts.max_tokens,
                         "top_p": opts.top_p,
+                        "num_ctx": settings.LLM_CONTEXT_WINDOW,
                     },
                 }
 

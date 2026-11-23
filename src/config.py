@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     RAG_THRESHOLD_FLEXIBLE: float = 0.45     # 异常排查类：多召回一些候选
     RAG_THRESHOLD_GENERAL: float = 0.45      # 未分类问题
     RAG_SPARSE_MAX_KEYWORDS: int = 8         # 关键词检索最多使用的 n-gram 数
+    # 上下文长度控制（字符数）：避免 prompt 超出模型上下文窗口导致回答被截断
+    RAG_MAX_DOC_CHARS: int = 1500            # 单篇知识文档最大字符数
+    RAG_MAX_CONTEXT_CHARS: int = 6000        # 所有知识文档的合计上限
 
     # ── 生成参数 ──
     LLM_TEMPERATURE_STANDARD: float = 0.3

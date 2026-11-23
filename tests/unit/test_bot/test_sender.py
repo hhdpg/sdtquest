@@ -47,6 +47,7 @@ class TestDingTalkMessageSender:
             open_conversation_id="conv_123",
             content="Hello!",
             at_user_ids=None,
+            at_names=None,
         )
         assert msg_id == "msg_id_123"
 
@@ -94,6 +95,7 @@ class TestDingTalkMessageSender:
             title="标题",
             text="**内容**",
             at_user_ids=None,
+            at_names=None,
         )
         assert msg_id == "msg_id_456"
 

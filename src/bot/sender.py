@@ -59,6 +59,7 @@ class DingTalkMessageSender:
         conversation_id: str,
         text: str,
         at_user_ids: list[str] | None = None,
+        at_names: list[str] | None = None,
     ) -> str:
         """
         发送纯文本消息。
@@ -66,7 +67,8 @@ class DingTalkMessageSender:
         Args:
             conversation_id: 会话 ID
             text: 文本内容
-            at_user_ids: 需要 @ 的用户 ID 列表
+            at_user_ids: 需要 @ 的用户 ID 列表（触发提醒）
+            at_names: 与 ID 对应的显示姓名
 
         Returns:
             消息 ID
@@ -84,6 +86,7 @@ class DingTalkMessageSender:
                 open_conversation_id=conversation_id,
                 content=text,
                 at_user_ids=at_user_ids,
+                at_names=at_names,
             )
 
             # 注册消息，以便后续更新
@@ -112,6 +115,7 @@ class DingTalkMessageSender:
         title: str,
         text: str,
         at_user_ids: list[str] | None = None,
+        at_names: list[str] | None = None,
     ) -> str:
         """
         发送 Markdown 格式消息。
@@ -120,7 +124,8 @@ class DingTalkMessageSender:
             conversation_id: 会话 ID
             title: 消息标题
             text: Markdown 内容
-            at_user_ids: 需要 @ 的用户 ID 列表
+            at_user_ids: 需要 @ 的用户 ID 列表（触发提醒）
+            at_names: 与 ID 对应的显示姓名
 
         Returns:
             消息 ID
@@ -139,6 +144,7 @@ class DingTalkMessageSender:
                 title=title,
                 text=text,
                 at_user_ids=at_user_ids,
+                at_names=at_names,
             )
 
             # 注册消息
@@ -242,6 +248,7 @@ class DingTalkMessageSender:
         title: str,
         text: str,
         at_user_ids: list[str] | None = None,
+        at_names: list[str] | None = None,
     ) -> str:
         """
         通过 Stream session_webhook 回复 Markdown 消息。
@@ -255,7 +262,8 @@ class DingTalkMessageSender:
             webhook_url: Stream 回调中的 session_webhook
             title: 消息标题
             text: Markdown 内容
-            at_user_ids: 需要 @ 的用户 ID 列表
+            at_user_ids: 需要 @ 的用户 ID 列表（触发提醒）
+            at_names: 与 ID 对应的显示姓名
 
         Returns:
             消息 ID
@@ -268,7 +276,9 @@ class DingTalkMessageSender:
 
         msg_content: dict[str, Any] = {"title": title, "text": text}
         if at_user_ids:
-            msg_content["text"] = "".join(f"@{uid} " for uid in at_user_ids) + text
+            msg_content["text"] = self.client._format_at_prefix(
+                at_user_ids, at_names
+            ) + text
             msg_content["atUserIds"] = at_user_ids
 
         message_id = await self.client.reply_by_webhook(

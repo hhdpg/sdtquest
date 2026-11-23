@@ -5,6 +5,7 @@
 
 from loguru import logger
 
+from src.config import settings
 from src.domain.enums import QuestionCategory
 from src.domain.models import KnowledgeItem, Message
 from src.llm.prompts.qa import build_qa_prompt
@@ -79,6 +80,9 @@ class ContextAssembler:
         """
         构建知识上下文文本
 
+        会按单文档和整体上限截断，避免 prompt 超出模型上下文窗口
+        导致回答被截断（9B 模型在超长 prompt 下只输出前几个 token）。
+
         Args:
             docs: 知识文档列表
 
@@ -88,8 +92,20 @@ class ContextAssembler:
         if not docs:
             return "（无相关知识）"
 
+        max_doc_chars = settings.RAG_MAX_DOC_CHARS
+        max_total_chars = settings.RAG_MAX_CONTEXT_CHARS
+
         parts = []
+        used = 0
         for i, doc in enumerate(docs, 1):
+            content = doc.content
+            if len(content) > max_doc_chars:
+                content = content[:max_doc_chars] + "\n...(内容过长已截断)"
+                logger.debug(
+                    "知识文档超长已截断 | title={} | 原始长度={}",
+                    doc.title, len(doc.content),
+                )
+
             doc_parts = [f"【文档{i}】{doc.title}"]
 
             # 添加页面信息
@@ -99,13 +115,24 @@ class ContextAssembler:
                 doc_parts.append(f"路径: {doc.page_path}")
 
             # 添加内容
-            doc_parts.append(f"内容: {doc.content}")
+            doc_parts.append(f"内容: {content}")
 
             # 添加标签
             if doc.tags:
                 doc_parts.append(f"标签: {', '.join(doc.tags)}")
 
-            parts.append("\n".join(doc_parts))
+            block = "\n".join(doc_parts)
+
+            # 整体预算控制：超限则停止追加后续文档
+            if used + len(block) > max_total_chars:
+                logger.info(
+                    "上下文达到长度上限，其余文档已跳过 | 已用={} | 上限={} | 跳过数量={}",
+                    used, max_total_chars, len(docs) - (i - 1),
+                )
+                break
+
+            parts.append(block)
+            used += len(block)
 
         return "\n\n".join(parts)
 
