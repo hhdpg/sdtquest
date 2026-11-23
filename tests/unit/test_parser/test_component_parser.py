@@ -204,3 +204,44 @@ class TestComponentParser:
         assert parser._clean_binding('"world"') == "world"
         assert parser._clean_binding("plain") == "plain"
         assert parser._clean_binding("") == ""
+
+
+class TestButtonTextInTemplate:
+    """<template> 内自定义标签的文本提取
+
+    回归保护: BeautifulSoup 在 <template> 内对 el-button 等自定义标签
+    调用 get_text() 会返回空串，导致所有按钮被解析成「未命名按钮」。
+    改用 decode_contents() 后可正确提取。
+    """
+
+    def test_button_text_extracted(self):
+        """按钮文字应被正确提取"""
+        from bs4 import BeautifulSoup
+
+        from src.parser.component_parser import ComponentParser
+
+        html = """
+        <template>
+          <el-button type="primary" @click="getList()">查询</el-button>
+          <el-button @click="handleReset()">重置</el-button>
+        </template>
+        """
+        soup = BeautifulSoup(html, "html.parser")
+        buttons = ComponentParser().extract_buttons(soup)
+
+        texts = [b.text for b in buttons]
+        assert "查询" in texts
+        assert "重置" in texts
+        assert "" not in texts
+
+    def test_button_with_whitespace(self):
+        """按钮文字中的多余空白应被规整"""
+        from bs4 import BeautifulSoup
+
+        from src.parser.component_parser import ComponentParser
+
+        html = "<template><el-button>  批量  导出  </el-button></template>"
+        soup = BeautifulSoup(html, "html.parser")
+        buttons = ComponentParser().extract_buttons(soup)
+
+        assert buttons[0].text == "批量 导出"

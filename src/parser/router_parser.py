@@ -120,18 +120,31 @@ class RouterParser:
         node: tree_sitter.Node,
         source_file: str,
     ) -> list[RouteInfo]:
-        """从变量声明中提取路由数组"""
+        """
+        从变量声明中提取路由。
+
+        支持两种形式:
+        1. const routes = [ {...}, {...} ]   (数组)
+        2. const businessRouter = { path, component, children }  (单个根路由对象)
+           —— Vue Element Admin 等模板常把每个菜单拆成一个模块文件
+        """
         routes: list[RouteInfo] = []
         for child in node.children:
-            if child.type == "variable_declarator":
-                # 找到数组
-                for sub in child.children:
-                    if sub.type == "array":
-                        for item in sub.children:
-                            if item.type == "object":
-                                route = self._parse_route_object(item, source_file)
-                                if route is not None:
-                                    routes.append(route)
+            if child.type != "variable_declarator":
+                continue
+            for sub in child.children:
+                if sub.type == "array":
+                    # 形式 1: 路由数组
+                    for item in sub.children:
+                        if item.type == "object":
+                            route = self._parse_route_object(item, source_file)
+                            if route is not None:
+                                routes.append(route)
+                elif sub.type == "object":
+                    # 形式 2: 单个根路由对象
+                    route = self._parse_route_object(sub, source_file)
+                    if route is not None:
+                        routes.append(route)
         return routes
 
     def _extract_routes_from_new_router(
@@ -210,10 +223,11 @@ class RouterParser:
 
     def _get_component_path(self, obj_node: tree_sitter.Node) -> str:
         """
-        提取组件路径,支持两种形式:
+        提取组件路径,支持以下形式:
         1. component: Layout (标识符)
-        2. component: () => import('@/views/xxx') (动态导入)
-        3. component: '@/views/xxx' (字符串,少见)
+        2. component: () => import('@/views/xxx') (动态 import)
+        3. component: resolve => require(['@/pages/xxx'], resolve) (异步 require)
+        4. component: '@/views/xxx' (字符串)
         """
         comp_node = self._find_property_value(obj_node, "component")
         if comp_node is None:
@@ -223,23 +237,41 @@ class RouterParser:
         if comp_node.type == "identifier":
             return self._node_text(comp_node)
 
-        # 形式 3: 字符串字面量
+        # 形式 4: 字符串字面量
         if comp_node.type == "string":
             return self._node_text(comp_node).strip("'\"")
 
-        # 形式 2: 箭头函数包含 import()
-        if comp_node.type in ("arrow_function", "function"):
+        # 形式 2/3: 函数/箭头函数中包含 import() 或 require([...])
+        if comp_node.type in ("arrow_function", "function", "parenthesized_expression"):
             text = self._node_text(comp_node)
-            # 提取 import('...') 中的路径
-            return self._extract_import_path(text)
+            # 优先匹配 import('...')
+            path = self._extract_import_path(text)
+            if path:
+                return path
+            # 再匹配 require(['...'], resolve)
+            return self._extract_require_path(text)
 
         return ""
 
     def _extract_import_path(self, code: str) -> str:
         """从 import('...') 表达式中提取路径字符串"""
-        # 简单正则:import('xxx') 或 import("xxx")
         import re
         match = re.search(r"""import\(\s*['"]([^'"]+)['"]\s*\)""", code)
+        return match.group(1) if match else ""
+
+    def _extract_require_path(self, code: str) -> str:
+        """
+        从 require(['@/pages/xxx'], resolve) 表达式中提取路径。
+
+        支持数组形式 require(['path'], resolve) 与字符串形式 require('path')。
+        """
+        import re
+        # 数组形式: require(['@/pages/xxx'], resolve)
+        match = re.search(r"""require\(\s*\[\s*['"]([^'"]+)['"]\s*\]""", code)
+        if match:
+            return match.group(1)
+        # 字符串形式: require('@/pages/xxx')
+        match = re.search(r"""require\(\s*['"]([^'"]+)['"]\s*\)""", code)
         return match.group(1) if match else ""
 
     def _find_property_value(

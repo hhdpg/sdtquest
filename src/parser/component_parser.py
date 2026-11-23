@@ -105,7 +105,10 @@ class ComponentParser:
             if not isinstance(tag, Tag):
                 continue
 
-            text = tag.get_text(strip=True)
+            # 注意: BeautifulSoup 在 <template> 内解析自定义标签（el-button 等）时，
+            # get_text() 会返回空串（内部状态异常），但 decode_contents() 正常。
+            # 这里统一用 decode_contents() 提取文本，再剥掉内部可能存在的标签。
+            text = self._extract_inner_text(tag)
             event = tag.get("@click") or ""
             permission = tag.get("v-permission") or ""
             button_type = tag.get("type") or ""
@@ -129,6 +132,28 @@ class ComponentParser:
             ))
 
         return buttons
+
+    @staticmethod
+    def _extract_inner_text(tag: Tag) -> str:
+        """
+        提取元素内部文本。
+
+        由于 BeautifulSoup 在 <template> 内对自定义标签调用 get_text()
+        会返回空串（已知问题），这里改用 decode_contents() 再剥离标签。
+
+        Args:
+            tag: BeautifulSoup 标签
+
+        Returns:
+            规整后的纯文本
+        """
+        import re
+
+        raw = tag.decode_contents()
+        # 剥离内部子标签，保留文本
+        text = re.sub(r"<[^>]+>", " ", raw)
+        # 合并空白
+        return re.sub(r"\s+", " ", text).strip()
 
     # ========================================================================
     # 表单提取

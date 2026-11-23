@@ -558,12 +558,13 @@ class VueProjectParser:
         result = ParseResult(project_root=self.project_root)
 
         # ── 1. 解析路由 ──
-        router_file = self._find_router_file()
-        if router_file is not None:
+        router_files = self._find_router_files()
+        for router_file in router_files:
             try:
-                result.routes = self.router_parser.parse_file(router_file)
+                parsed = self.router_parser.parse_file(router_file)
+                result.routes.extend(parsed)
             except ParserError as e:
-                result.errors.append(f"路由解析失败: {e}")
+                result.errors.append(f"路由解析失败({router_file.name}): {e}")
 
         # ── 2. 解析 Store ──
         store_dir = self._find_store_dir()
@@ -597,18 +598,43 @@ class VueProjectParser:
 
         return result
 
-    def _find_router_file(self) -> Path | None:
-        """在项目根目录下查找路由配置文件"""
+    def _find_router_files(self) -> list[Path]:
+        """
+        查找所有路由配置文件。
+
+        除常见的主配置文件外，还会扫描 router/modules/ 目录下的
+        模块化路由文件（Vue Element Admin 等模板常把路由拆分到此处）。
+
+        Returns:
+            路由文件路径列表（去重后）
+        """
         candidates = [
             self.project_root / "src" / "router" / "index.js",
             self.project_root / "src" / "router" / "index.ts",
             self.project_root / "src" / "router.js",
             self.project_root / "router" / "index.js",
         ]
-        for c in candidates:
-            if c.exists():
-                return c
-        return None
+        files: list[Path] = [c for c in candidates if c.exists()]
+
+        # 扫描模块化路由目录
+        for modules_dir in (
+            self.project_root / "src" / "router" / "modules",
+            self.project_root / "router" / "modules",
+        ):
+            if modules_dir.is_dir():
+                for f in sorted(modules_dir.glob("*.js")):
+                    files.append(f)
+                for f in sorted(modules_dir.glob("*.ts")):
+                    files.append(f)
+
+        # 去重并保持顺序
+        seen: set[Path] = set()
+        unique: list[Path] = []
+        for f in files:
+            if f not in seen:
+                seen.add(f)
+                unique.append(f)
+        return unique
 
     def _find_store_dir(self) -> Path | None:
         """在项目根目录下查找 Store 目录"""
