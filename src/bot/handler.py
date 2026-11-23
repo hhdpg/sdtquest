@@ -134,6 +134,8 @@ class BotHandler:
         sender_nick = message_data.get("sender_nick", "")
         raw_text = message_data.get("text", "")
         message_id = message_data.get("message_id", "")
+        session_webhook = message_data.get("session_webhook", "")
+        is_in_at_list = message_data.get("is_in_at_list")
 
         logger.info(
             "收到消息 | sender={}({}) | text={} | msg_id={}",
@@ -142,6 +144,13 @@ class BotHandler:
             raw_text[:50] if raw_text else "",
             message_id[:20] if message_id else "N/A",
         )
+
+        # ── 0. @ 机器人校验 ──
+        # is_in_at_list 只有在明确为 False 时不处理；None/缺失时不做拦截，
+        # 避免不同钉钉版本字段缺失导致机器人彻底不响应。
+        if is_in_at_list is False:
+            logger.debug("消息未 @ 机器人，跳过 | msg_id={}", message_id[:20])
+            return
 
         # ── 1. 去重检查 ──
         if message_id and await self._is_duplicate(message_id):
@@ -178,7 +187,10 @@ class BotHandler:
         # ── 4. 发送即时反馈 ──
         hint_message_id = ""
         try:
-            hint_message_id = await self.sender.send_thinking_hint(conversation_id)
+            if session_webhook:
+                hint_message_id = await self.sender.send_thinking_hint_via_webhook(session_webhook)
+            else:
+                hint_message_id = await self.sender.send_thinking_hint(conversation_id)
         except Exception as e:
             logger.warning("发送即时反馈失败 | error={}", str(e))
 
@@ -198,8 +210,13 @@ class BotHandler:
                 sender_id=sender_id,
             )
 
-            # ── 7. 发送回答 ──
-            await self._send_answer(conversation_id, hint_message_id, answer)
+            # ── 7. 发送回答（@提问人）──
+            await self._send_answer(
+                conversation_id=conversation_id,
+                session_webhook=session_webhook,
+                at_user_ids=[sender_id] if sender_id else None,
+                answer=answer,
+            )
 
             # ── 8. 记录助手消息到会话 ──
             assistant_message = Message(role="assistant", content=answer.text)
@@ -216,12 +233,13 @@ class BotHandler:
 
         except QuestionProcessingError as e:
             logger.error("问题处理失败 | error={}", str(e))
-            await self._handle_error(conversation_id, hint_message_id, str(e))
+            await self._handle_error(conversation_id, session_webhook, hint_message_id, str(e))
 
         except LLMServiceError as e:
             logger.error("LLM 服务异常 | error={}", str(e))
             await self._handle_error(
                 conversation_id,
+                session_webhook,
                 hint_message_id,
                 "⚠️ 服务繁忙，请稍后再试。",
             )
@@ -230,6 +248,7 @@ class BotHandler:
             logger.exception("消息处理未知异常 | error={}", str(e))
             await self._handle_error(
                 conversation_id,
+                session_webhook,
                 hint_message_id,
                 "⚠️ 暂时无法回答您的问题，请联系管理员。",
             )
@@ -325,41 +344,50 @@ class BotHandler:
     async def _send_answer(
         self,
         conversation_id: str,
-        hint_message_id: str,
+        session_webhook: str,
+        at_user_ids: list[str] | None,
         answer: Answer,
     ) -> None:
         """
-        发送回答消息。
+        发送回答消息，并 @ 提问人。
 
-        如果有 hint_message_id，尝试更新该消息为最终回答；
-        否则发送新的 Markdown 消息。
+        发送策略（按优先级）:
+        1. 有 session_webhook → 通过 webhook 回复到原群（推荐，支持 @）
+        2. 否则 → 通过 robotCode 群发接口发送（支持 @）
+
+        注意: 不再走 "更新思考中消息" 的路径，因为钉钉机器人消息更新接口
+        默认不可用，会导致回答静默丢失。
 
         Args:
             conversation_id: 会话 ID
-            hint_message_id: "思考中..." 消息的 ID
+            session_webhook: Stream 回调中的 session_webhook（可为空）
+            at_user_ids: 需要 @ 的用户 ID 列表
             answer: 回答对象
         """
-        # 格式化回答内容
         formatted_text = self._format_answer(answer)
 
-        if hint_message_id:
-            # 尝试更新 "思考中..." 消息
+        # ── 首选: session_webhook 回复 ──
+        if session_webhook:
             try:
-                await self.sender.update_message(hint_message_id, formatted_text)
-                logger.debug("已更新提示消息为最终回答 | hint_id={}", hint_message_id[:20])
+                await self.sender.reply_markdown_via_webhook(
+                    webhook_url=session_webhook,
+                    title="回答",
+                    text=formatted_text,
+                    at_user_ids=at_user_ids,
+                )
+                logger.debug("已通过 webhook 回复回答 | at_count={}", len(at_user_ids or []))
                 return
             except Exception as e:
                 logger.warning(
-                    "更新提示消息失败，发送新消息 | hint_id={} | error={}",
-                    hint_message_id[:20],
-                    str(e),
+                    "webhook 回复失败，回退到群发接口 | error={}", str(e)
                 )
 
-        # 发送新的 Markdown 消息
+        # ── 回退: robotCode 群发接口 ──
         await self.sender.send_markdown(
             conversation_id=conversation_id,
             title="回答",
             text=formatted_text,
+            at_user_ids=at_user_ids,
         )
 
     def _format_answer(self, answer: Answer) -> str:
@@ -389,23 +417,31 @@ class BotHandler:
     async def _handle_error(
         self,
         conversation_id: str,
+        session_webhook: str,
         hint_message_id: str,
         error_text: str,
     ) -> None:
         """
         处理错误情况，向用户发送错误提示。
 
+        同样优先使用 session_webhook 回复，失败再回退到群发接口。
+
         Args:
             conversation_id: 会话 ID
-            hint_message_id: "思考中..." 消息的 ID
+            session_webhook: Stream 回调中的 session_webhook（可为空）
+            hint_message_id: "思考中..." 消息的 ID（保留参数以兼容调用方）
             error_text: 错误提示文本
         """
-        if hint_message_id:
+        if session_webhook:
             try:
-                await self.sender.update_message(hint_message_id, error_text)
+                await self.sender.reply_markdown_via_webhook(
+                    webhook_url=session_webhook,
+                    title="提示",
+                    text=error_text,
+                )
                 return
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("webhook 发送错误提示失败，回退群发 | error={}", str(e))
 
         try:
             await self.sender.send_error_message(conversation_id, error_text)

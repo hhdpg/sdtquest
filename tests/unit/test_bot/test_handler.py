@@ -49,6 +49,8 @@ class TestBotHandler:
         sender.send_thinking_hint = AsyncMock(return_value="hint_msg_id")
         sender.send_error_message = AsyncMock(return_value="error_msg_id")
         sender.update_message = AsyncMock()
+        sender.reply_markdown_via_webhook = AsyncMock(return_value="webhook_msg_id")
+        sender.send_thinking_hint_via_webhook = AsyncMock(return_value="webhook_hint_id")
         return sender
 
     @pytest.fixture
@@ -193,8 +195,11 @@ class TestBotHandler:
         # 验证发送了思考中提示
         mock_sender.send_thinking_hint.assert_called_once()
 
-        # 验证更新了消息
-        mock_sender.update_message.assert_called_once()
+        # 验证发送了回答（无 webhook 时走群发接口），并 @ 提问人
+        mock_sender.send_markdown.assert_called_once()
+        call_kwargs = mock_sender.send_markdown.call_args.kwargs
+        assert call_kwargs["at_user_ids"] == ["user_456"]
+        assert call_kwargs["conversation_id"] == "conv_123"
 
     @pytest.mark.asyncio
     async def test_on_message_empty_question(
@@ -270,9 +275,9 @@ class TestBotHandler:
         message_data = self._make_message_data()
         await handler.on_message(message_data)
 
-        # 应发送错误消息
-        mock_sender.update_message.assert_called_once()
-        call_args = mock_sender.update_message.call_args
+        # 应发送错误消息（无 webhook 时走 send_error_message）
+        mock_sender.send_error_message.assert_called_once()
+        call_args = mock_sender.send_error_message.call_args
         assert "服务繁忙" in call_args[0][1]
 
     @pytest.mark.asyncio
@@ -287,7 +292,7 @@ class TestBotHandler:
         await handler.on_message(message_data)
 
         # 应发送错误消息
-        mock_sender.update_message.assert_called_once()
+        mock_sender.send_error_message.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_on_message_unknown_error(
@@ -299,8 +304,8 @@ class TestBotHandler:
         await handler.on_message(message_data)
 
         # 应发送通用错误消息
-        mock_sender.update_message.assert_called_once()
-        call_args = mock_sender.update_message.call_args
+        mock_sender.send_error_message.assert_called_once()
+        call_args = mock_sender.send_error_message.call_args
         assert "暂时无法回答" in call_args[0][1]
 
     @pytest.mark.asyncio
@@ -387,3 +392,88 @@ class TestBotHandler:
         mock_qa_service.ask.assert_called_once()
         call_args = mock_qa_service.ask.call_args
         assert len(call_args[1]["question_text"]) <= 10
+
+    # ====================================================================
+    # @提问人 与 webhook 回复
+    # ====================================================================
+
+    @pytest.mark.asyncio
+    async def test_reply_at_asker(
+        self, handler: BotHandler, mock_qa_service: MagicMock, mock_sender: MagicMock
+    ) -> None:
+        """回答时应在 at_user_ids 中包含提问人"""
+        message_data = self._make_message_data(sender_id="user_999")
+        await handler.on_message(message_data)
+
+        call_kwargs = mock_sender.send_markdown.call_args.kwargs
+        assert call_kwargs["at_user_ids"] == ["user_999"]
+
+    @pytest.mark.asyncio
+    async def test_uses_webhook_when_available(
+        self, handler: BotHandler, mock_qa_service: MagicMock, mock_sender: MagicMock
+    ) -> None:
+        """存在 session_webhook 时应优先走 webhook 通道，并 @ 提问人"""
+        message_data = self._make_message_data(sender_id="user_999")
+        message_data["session_webhook"] = "https://oapi.dingtalk.com/robot/sendBySession?session=xyz"
+
+        await handler.on_message(message_data)
+
+        mock_sender.reply_markdown_via_webhook.assert_called_once()
+        call_kwargs = mock_sender.reply_markdown_via_webhook.call_args.kwargs
+        assert call_kwargs["at_user_ids"] == ["user_999"]
+        assert call_kwargs["webhook_url"].endswith("session=xyz")
+        # 走 webhook 后不应再走群发接口
+        mock_sender.send_markdown.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_falls_back_when_webhook_fails(
+        self, handler: BotHandler, mock_qa_service: MagicMock, mock_sender: MagicMock
+    ) -> None:
+        """webhook 失败时应回退到群发接口，保证回答不丢"""
+        mock_sender.reply_markdown_via_webhook = AsyncMock(
+            side_effect=Exception("webhook 失效")
+        )
+        message_data = self._make_message_data(sender_id="user_999")
+        message_data["session_webhook"] = "https://example.com/sendBySession"
+
+        await handler.on_message(message_data)
+
+        mock_sender.send_markdown.assert_called_once()
+        assert mock_sender.send_markdown.call_args.kwargs["at_user_ids"] == ["user_999"]
+
+    @pytest.mark.asyncio
+    async def test_skip_when_not_at_bot(
+        self, handler: BotHandler, mock_qa_service: MagicMock, mock_sender: MagicMock
+    ) -> None:
+        """消息明确未 @ 机器人时应跳过，避免群里任意消息触发回答"""
+        message_data = self._make_message_data(text="大家好")
+        message_data["is_in_at_list"] = False
+
+        await handler.on_message(message_data)
+
+        mock_qa_service.ask.assert_not_called()
+        mock_sender.send_thinking_hint.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_process_when_at_bot(
+        self, handler: BotHandler, mock_qa_service: MagicMock, mock_sender: MagicMock
+    ) -> None:
+        """消息明确 @ 机器人时应正常处理"""
+        message_data = self._make_message_data()
+        message_data["is_in_at_list"] = True
+
+        await handler.on_message(message_data)
+
+        mock_qa_service.ask.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_process_when_at_flag_missing(
+        self, handler: BotHandler, mock_qa_service: MagicMock, mock_sender: MagicMock
+    ) -> None:
+        """字段缺失时不应拦截（兼容不同钉钉版本）"""
+        message_data = self._make_message_data()
+        # 不设置 is_in_at_list
+
+        await handler.on_message(message_data)
+
+        mock_qa_service.ask.assert_called_once()

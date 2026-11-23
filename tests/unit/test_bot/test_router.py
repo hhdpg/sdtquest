@@ -129,6 +129,44 @@ class TestBotRouter:
         assert result["conversation_id"] == "conv_123"
         assert result["sender_id"] == ""
 
+    def test_parse_callback_extracts_at_flag_and_webhook(self, router: BotRouter) -> None:
+        """解析回调应提取 is_in_at_list 与 session_webhook"""
+        callback = MagicMock()
+        callback.conversation_id = "conv_123"
+        callback.sender_id = "user_1"
+        callback.sender_nick = "张三"
+        callback.text = MagicMock(content="问题")
+        callback.message_id = "msg_1"
+        callback.conversation_type = "2"
+        callback.chatbot_user_id = "bot_1"
+        callback.session_webhook = "https://x/sendBySession?s=1"
+        callback.session_webhook_expired_time = 123
+        callback.is_in_at_list = True
+
+        result = router._parse_callback(callback)
+        assert result["is_in_at_list"] is True
+        assert result["session_webhook"] == "https://x/sendBySession?s=1"
+
+    def test_parse_callback_missing_at_flag_is_none(self, router: BotRouter) -> None:
+        """缺失 is_in_at_list 时应为 None（而非 False 导致误拦截）"""
+        callback = MagicMock(spec=["conversation_id", "sender_id"])
+        callback.conversation_id = "conv_123"
+        callback.sender_id = "user_1"
+
+        result = router._parse_callback(callback)
+        assert result["is_in_at_list"] is None
+
+    def test_sdk_client_class_is_importable(self) -> None:
+        """dingtalk-stream SDK 的客户端类名必须与代码一致
+
+        回归保护: 代码曾使用 OpenDingTalkStreamClient，而实际安装的 SDK
+        导出的是 DingTalkStreamClient，导致机器人启动时 ImportError 静默失败。
+        """
+        from dingtalk_stream import DingTalkStreamClient  # noqa: F401
+
+        # 确认代码引用的类可被导入
+        import src.bot.router  # noqa: F401
+
     # ====================================================================
     # 停止
     # ====================================================================

@@ -54,13 +54,19 @@ class DingTalkMessageSender:
 
         logger.info("DingTalkMessageSender 初始化完成")
 
-    async def send_text(self, conversation_id: str, text: str) -> str:
+    async def send_text(
+        self,
+        conversation_id: str,
+        text: str,
+        at_user_ids: list[str] | None = None,
+    ) -> str:
         """
         发送纯文本消息。
 
         Args:
             conversation_id: 会话 ID
             text: 文本内容
+            at_user_ids: 需要 @ 的用户 ID 列表
 
         Returns:
             消息 ID
@@ -77,6 +83,7 @@ class DingTalkMessageSender:
             message_id = await self.client.send_text(
                 open_conversation_id=conversation_id,
                 content=text,
+                at_user_ids=at_user_ids,
             )
 
             # 注册消息，以便后续更新
@@ -104,6 +111,7 @@ class DingTalkMessageSender:
         conversation_id: str,
         title: str,
         text: str,
+        at_user_ids: list[str] | None = None,
     ) -> str:
         """
         发送 Markdown 格式消息。
@@ -112,6 +120,7 @@ class DingTalkMessageSender:
             conversation_id: 会话 ID
             title: 消息标题
             text: Markdown 内容
+            at_user_ids: 需要 @ 的用户 ID 列表
 
         Returns:
             消息 ID
@@ -129,6 +138,7 @@ class DingTalkMessageSender:
                 open_conversation_id=conversation_id,
                 title=title,
                 text=text,
+                at_user_ids=at_user_ids,
             )
 
             # 注册消息
@@ -226,6 +236,53 @@ class DingTalkMessageSender:
                 )
                 raise DingTalkAPIError("消息未在注册表中，无法更新")
 
+    async def reply_markdown_via_webhook(
+        self,
+        webhook_url: str,
+        title: str,
+        text: str,
+        at_user_ids: list[str] | None = None,
+    ) -> str:
+        """
+        通过 Stream session_webhook 回复 Markdown 消息。
+
+        这是群内 @机器人 场景的首选回复通道:
+        - 无需 access_token
+        - 自动回复到提问所在群
+        - 支持 @ 指定用户
+
+        Args:
+            webhook_url: Stream 回调中的 session_webhook
+            title: 消息标题
+            text: Markdown 内容
+            at_user_ids: 需要 @ 的用户 ID 列表
+
+        Returns:
+            消息 ID
+
+        Raises:
+            DingTalkAPIError: 发送失败
+        """
+        if not text:
+            raise DingTalkAPIError("消息内容不能为空")
+
+        msg_content: dict[str, Any] = {"title": title, "text": text}
+        if at_user_ids:
+            msg_content["text"] = "".join(f"@{uid} " for uid in at_user_ids) + text
+            msg_content["atUserIds"] = at_user_ids
+
+        message_id = await self.client.reply_by_webhook(
+            webhook_url=webhook_url,
+            msg_type="markdown",
+            msg_content=msg_content,
+        )
+        logger.info(
+            "webhook 回复 Markdown 成功 | at_count={} | msg_id={}",
+            len(at_user_ids or []),
+            (message_id or "N/A")[:20],
+        )
+        return message_id
+
     async def send_thinking_hint(self, conversation_id: str) -> str:
         """
         发送 "正在思考..." 的即时反馈消息。
@@ -240,6 +297,22 @@ class DingTalkMessageSender:
         """
         thinking_text = "🤔 正在为您查找答案，请稍候..."
         return await self.send_text(conversation_id, thinking_text)
+
+    async def send_thinking_hint_via_webhook(self, webhook_url: str) -> str:
+        """
+        通过 session_webhook 发送 "正在思考..." 反馈。
+
+        Args:
+            webhook_url: Stream 回调中的 session_webhook
+
+        Returns:
+            消息 ID
+        """
+        return await self.client.reply_by_webhook(
+            webhook_url=webhook_url,
+            msg_type="text",
+            msg_content={"content": "🤔 正在为您查找答案，请稍候..."},
+        )
 
     async def send_error_message(self, conversation_id: str, message: str | None = None) -> str:
         """

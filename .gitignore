@@ -40,7 +40,10 @@ env/
 # 数据目录
 data/chroma_db/
 data/analytics.db
+data/analytics.db-shm
+data/analytics.db-wal
 data/cache/
+data/knowledge/
 data/logs/
 
 # 测试

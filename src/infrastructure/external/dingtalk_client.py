@@ -3,6 +3,7 @@
 封装钉钉开放平台 API 调用，支持消息发送、更新等操作。
 """
 
+import json
 from typing import Any
 
 import httpx
@@ -97,6 +98,7 @@ class DingTalkClient:
         self,
         open_conversation_id: str,
         content: str,
+        at_user_ids: list[str] | None = None,
     ) -> str:
         """
         发送纯文本消息
@@ -104,6 +106,7 @@ class DingTalkClient:
         Args:
             open_conversation_id: 会话 ID
             content: 文本内容
+            at_user_ids: 需要 @ 的用户 ID 列表
 
         Returns:
             消息 ID
@@ -111,10 +114,19 @@ class DingTalkClient:
         Raises:
             DingTalkAPIError: 发送失败
         """
+        msg_content: dict[str, Any] = {"content": content}
+        if at_user_ids:
+            # 纯文本消息中 @ 用户需要在正文写 @userId，并声明 atUserIds
+            msg_content["content"] = (
+                "".join(f"@{uid} " for uid in at_user_ids) + content
+            )
+            msg_content["atUserIds"] = at_user_ids
+
         return await self._send_message(
             open_conversation_id=open_conversation_id,
             msg_type="text",
-            msg_content={"content": content},
+            msg_content=msg_content,
+            at_user_ids=at_user_ids,
         )
 
     async def send_markdown(
@@ -122,6 +134,7 @@ class DingTalkClient:
         open_conversation_id: str,
         title: str,
         text: str,
+        at_user_ids: list[str] | None = None,
     ) -> str:
         """
         发送 Markdown 格式消息
@@ -130,6 +143,7 @@ class DingTalkClient:
             open_conversation_id: 会话 ID
             title: 消息标题
             text: Markdown 内容
+            at_user_ids: 需要 @ 的用户 ID 列表
 
         Returns:
             消息 ID
@@ -137,25 +151,101 @@ class DingTalkClient:
         Raises:
             DingTalkAPIError: 发送失败
         """
+        msg_content: dict[str, Any] = {"title": title, "text": text}
+        if at_user_ids:
+            # Markdown 消息中 @ 用户需要在正文写 @userId，并声明 atUserIds
+            msg_content["text"] = (
+                "".join(f"@{uid} " for uid in at_user_ids) + text
+            )
+            msg_content["atUserIds"] = at_user_ids
+
         return await self._send_message(
             open_conversation_id=open_conversation_id,
             msg_type="markdown",
-            msg_content={"title": title, "text": text},
+            msg_content=msg_content,
+            at_user_ids=at_user_ids,
         )
+
+    async def reply_by_webhook(
+        self,
+        webhook_url: str,
+        msg_type: str,
+        msg_content: dict[str, Any],
+    ) -> str:
+        """
+        通过 Stream 回调返回的 session_webhook 回复消息。
+
+        相比 robotCode 群发接口，session_webhook 的优势:
+        - 无需 access_token
+        - 天然绑定原会话，直接回复到提问所在群
+        - 有效期由钉钉控制（通常数小时）
+
+        Args:
+            webhook_url: Stream 回调中的 session_webhook
+            msg_type: 消息类型（text / markdown）
+            msg_content: 消息内容
+
+        Returns:
+            钉钉返回的 messageId（可能为空）
+
+        Raises:
+            DingTalkAPIError: 发送失败
+        """
+        if not webhook_url:
+            raise DingTalkAPIError("session_webhook 不能为空")
+
+        payload = {
+            "msgtype": msg_type,
+            msg_type: msg_content,
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(
+                    webhook_url,
+                    headers={"Content-Type": "application/json"},
+                    json=payload,
+                )
+                response.raise_for_status()
+                result = response.json()
+
+            # 钉钉 webhook 返回 {"errcode":0,"errmsg":"ok","result":{"messageId":"..."}}
+            if result.get("errcode", 0) != 0:
+                raise DingTalkAPIError(
+                    f"webhook 发送被拒绝: {result.get('errmsg')}"
+                )
+
+            message_id = (result.get("result") or {}).get("messageId", "")
+            logger.info("webhook 发送成功 | type={} | msg_id={}", msg_type, message_id)
+            return message_id
+
+        except DingTalkAPIError:
+            raise
+        except httpx.HTTPStatusError as e:
+            logger.error(
+                "webhook 发送失败 | status={} | body={}",
+                e.response.status_code, e.response.text[:200],
+            )
+            raise DingTalkAPIError(f"webhook 发送失败: {e.response.status_code}") from e
+        except Exception as e:
+            logger.error("webhook 发送异常 | error={}", str(e))
+            raise DingTalkAPIError(f"webhook 发送异常: {e}") from e
 
     async def _send_message(
         self,
         open_conversation_id: str,
         msg_type: str,
         msg_content: dict[str, Any],
+        at_user_ids: list[str] | None = None,
     ) -> str:
         """
-        发送消息的内部实现
+        发送消息的内部实现（robotCode 群发接口）
 
         Args:
             open_conversation_id: 会话 ID
             msg_type: 消息类型 (text/markdown/action_card 等)
             msg_content: 消息内容
+            at_user_ids: 需要 @ 的用户 ID 列表
 
         Returns:
             消息 ID
@@ -165,6 +255,17 @@ class DingTalkClient:
         """
         token = await self.get_access_token()
 
+        body: dict[str, Any] = {
+            # msgParam 必须是合法 JSON 字符串；用 json.dumps 而非 str() 拼接，
+            # 否则内容中的引号/换行会导致接口 400。
+            "msgParam": json.dumps(msg_content, ensure_ascii=False),
+            "msgKey": self._get_msg_key(msg_type),
+            "openConversationId": open_conversation_id,
+            "robotCode": self.robot_code,
+        }
+        if at_user_ids:
+            body["atUserIds"] = at_user_ids
+
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(
@@ -173,12 +274,7 @@ class DingTalkClient:
                         "x-acs-dingtalk-access-token": token,
                         "Content-Type": "application/json",
                     },
-                    json={
-                        "msgParam": str(msg_content).replace("'", '"'),
-                        "msgKey": self._get_msg_key(msg_type),
-                        "openConversationId": open_conversation_id,
-                        "robotCode": self.robot_code,
-                    },
+                    json=body,
                 )
                 response.raise_for_status()
                 result = response.json()
@@ -206,24 +302,26 @@ class DingTalkClient:
         new_content: str,
     ) -> None:
         """
-        更新已发送的消息
+        更新已发送的机器人消息。
 
-        注意: 钉钉 API 对消息更新的支持有限，此方法可能不适用于所有场景。
+        钉钉的机器人消息更新接口需要额外的应用权限，默认不可用。
+        这里显式抛出不支持异常，让上层（DingTalkMessageSender）走
+        "撤回重发" 的可靠回退路径，而不是静默失败导致用户看不到回答。
 
         Args:
             message_id: 消息 ID
             new_content: 新的消息内容
 
         Raises:
-            DingTalkAPIError: 更新失败
+            DingTalkAPIError: 该接口暂不支持，调用方应回退到撤回重发
         """
-        # 钉钉 API 更新消息的实现取决于具体的 API 版本
-        # 这里提供一个占位实现
         logger.warning(
-            "更新消息功能需要特殊权限 | message_id={} | 钉钉 API 限制",
-            message_id
+            "机器人消息更新接口不可用，需回退到撤回重发 | message_id={}",
+            message_id,
         )
-        # 实际上可以通过发送新消息或撤回重发来模拟更新
+        raise DingTalkAPIError(
+            "钉钉机器人消息更新接口不可用，请使用撤回重发"
+        )
 
     async def recall_message(
         self,

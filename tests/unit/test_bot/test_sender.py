@@ -46,6 +46,7 @@ class TestDingTalkMessageSender:
         mock_client.send_text.assert_called_once_with(
             open_conversation_id="conv_123",
             content="Hello!",
+            at_user_ids=None,
         )
         assert msg_id == "msg_id_123"
 
@@ -92,6 +93,7 @@ class TestDingTalkMessageSender:
             open_conversation_id="conv_123",
             title="标题",
             text="**内容**",
+            at_user_ids=None,
         )
         assert msg_id == "msg_id_456"
 

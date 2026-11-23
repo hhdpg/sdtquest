@@ -98,7 +98,7 @@ class BotRouter:
                 ChatbotHandler,
                 ChatbotMessage,
                 Credential,
-                OpenDingTalkStreamClient,
+                DingTalkStreamClient,
             )
         except ImportError:
             logger.error("请先安装 dingtalk-stream: uv pip install dingtalk-stream")
@@ -140,7 +140,7 @@ class BotRouter:
         stream_handler = StreamMessageHandler()
 
         # 创建 Stream 客户端
-        self._stream_client = OpenDingTalkStreamClient(credential)
+        self._stream_client = DingTalkStreamClient(credential)
         self._stream_client.register_callback_handler(
             ChatbotMessage.TOPIC,
             stream_handler,
@@ -268,6 +268,9 @@ class BotRouter:
             "session_webhook_expired_time": getattr(
                 callback, "session_webhook_expired_time", 0
             ),
+            # is_in_at_list 用于判断消息是否 @ 了机器人；
+            # 部分钉钉版本可能缺失该字段，此时为 None，由 handler 决定不拦截。
+            "is_in_at_list": getattr(callback, "is_in_at_list", None),
         }
 
         logger.debug(
