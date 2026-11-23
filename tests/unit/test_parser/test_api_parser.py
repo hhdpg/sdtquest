@@ -119,3 +119,68 @@ class TestAPIParser:
         assert "JSON" not in calls
         assert "Promise" not in calls
         assert "setTimeout" not in calls
+
+
+class TestAPIParserTemplateAndNesting:
+    """模板字符串 URL 与嵌套目录
+
+    回归保护: 实际项目用 const base = `${process.env.X}/api` 定义前缀，
+    接口 URL 写成 url: `${base}/order/query`；且 API 文件按业务域放在
+    子目录（src/api/biz/order.js）。旧实现只 glob 顶层 *.js 且不展开变量，
+    导致 800+ 个接口解析出 0 条。
+    """
+
+    @pytest.fixture
+    def parser(self) -> APIParser:
+        return APIParser()
+
+    def test_template_variable_resolved(self, parser: APIParser) -> None:
+        """模板字符串中的常量应被展开"""
+        code = """
+        const baseUrl = `${process.env.VUE_APP_SYS_API}/hd-united-store/api`
+        export function queryOrder(params) {
+          return request({
+            url: `${baseUrl}/order/batch/query`,
+            method: 'get',
+            params
+          })
+        }
+        """
+        apis = parser.parse_code(code)
+
+        assert len(apis) == 1
+        assert apis[0].function_name == "queryOrder"
+        assert apis[0].method == "get"
+        assert apis[0].url == "{ENV}/hd-united-store/api/order/batch/query"
+
+    def test_const_without_request_not_parsed(self, parser: APIParser) -> None:
+        """纯字符串常量不应被当成接口"""
+        code = """
+        const baseUrl = `${process.env.X}/api`
+        const headers = { 'Content-Type': 'application/json' }
+        export function queryUser() {
+          return request({ url: `${baseUrl}/user/info`, method: 'POST' })
+        }
+        """
+        apis = parser.parse_code(code)
+
+        names = [a.function_name for a in apis]
+        assert "queryUser" in names
+        assert "baseUrl" not in names
+        assert "headers" not in names
+
+    def test_directory_recursive(self, parser: APIParser, tmp_path: Path) -> None:
+        """应递归扫描子目录中的 API 文件"""
+        sub = tmp_path / "biz"
+        sub.mkdir()
+        (sub / "order.js").write_text(
+            "export function getOrder(p) {\n"
+            "  return request({ url: '/api/order', method: 'get', params: p })\n"
+            "}\n",
+            encoding="utf-8",
+        )
+
+        apis = parser.parse_directory(tmp_path)
+
+        assert len(apis) == 1
+        assert apis[0].function_name == "getOrder"

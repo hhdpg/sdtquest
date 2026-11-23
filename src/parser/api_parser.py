@@ -62,7 +62,9 @@ class APIParser:
             raise ParserError(f"API 目录不存在: {dir_path}")
 
         apis: list[APIInfo] = []
-        for js_file in sorted(path.glob("*.js")):
+        # 递归扫描子目录：实际项目常按业务域拆分子目录
+        # （如 src/api/shundiantong/order.js）
+        for js_file in sorted(path.rglob("*.js")):
             try:
                 found = self.parse_file(js_file)
                 apis.extend(found)
@@ -118,32 +120,40 @@ class APIParser:
         root = tree.root_node
 
         apis: list[APIInfo] = []
+        # 收集文件内常量，用于展开 URL 模板字符串中的 ${var}
+        constants = self._collect_constants(code)
 
         for node in root.children:
             # 形式 1: export function xxx(params) { ... }
             if node.type == "export_statement":
                 for child in node.children:
                     if child.type == "function_declaration":
-                        api = self._parse_function_declaration(child, source_file)
+                        api = self._parse_function_declaration(
+                            child, source_file, constants
+                        )
                         if api is not None:
                             apis.append(api)
                     elif child.type == "lexical_declaration":
                         # export const xxx = ...
                         for sub in child.children:
                             if sub.type == "variable_declarator":
-                                api = self._parse_variable_declarator(sub, source_file)
+                                api = self._parse_variable_declarator(
+                                    sub, source_file, constants
+                                )
                                 if api is not None:
                                     apis.append(api)
             # 形式 2: function xxx(params) { ... } (非 export,但可能在文件中)
             elif node.type == "function_declaration":
-                api = self._parse_function_declaration(node, source_file)
+                api = self._parse_function_declaration(node, source_file, constants)
                 if api is not None:
                     apis.append(api)
             # 形式 3: const xxx = params => ...
             elif node.type == "lexical_declaration":
                 for child in node.children:
                     if child.type == "variable_declarator":
-                        api = self._parse_variable_declarator(child, source_file)
+                        api = self._parse_variable_declarator(
+                            child, source_file, constants
+                        )
                         if api is not None:
                             apis.append(api)
 
@@ -186,6 +196,7 @@ class APIParser:
         self,
         func_node: tree_sitter.Node,
         source_file: str,
+        constants: dict[str, str] | None = None,
     ) -> APIInfo | None:
         """解析 export function xxx(params) { return request({ ... }) }"""
         function_name = ""
@@ -204,7 +215,7 @@ class APIParser:
             return None
 
         # 从函数体中提取 request({ ... }) 调用
-        method, url = self._extract_request_info(body_node)
+        method, url = self._extract_request_info(body_node, constants)
 
         return APIInfo(
             function_name=function_name,
@@ -218,6 +229,7 @@ class APIParser:
         self,
         declarator: tree_sitter.Node,
         source_file: str,
+        constants: dict[str, str] | None = None,
     ) -> APIInfo | None:
         """解析 export const xxx = params => request({ ... })"""
         function_name = ""
@@ -239,8 +251,17 @@ class APIParser:
         if not function_name:
             return None
 
+        # 只保留真正的接口定义（值必须是函数/箭头函数）。
+        # 字符串常量（如 const divctUrl = `...`）不是接口，跳过。
+        if value_node is None:
+            return None
+
         # 从函数体中提取 request({ ... }) 调用
-        method, url = self._extract_request_info(value_node)
+        method, url = self._extract_request_info(value_node, constants)
+
+        # 没有 url 说明不是接口定义
+        if not url:
+            return None
 
         return APIInfo(
             function_name=function_name,
@@ -253,9 +274,15 @@ class APIParser:
     def _extract_request_info(
         self,
         node: tree_sitter.Node | None,
+        constants: dict[str, str] | None = None,
     ) -> tuple[str, str]:
         """
         从节点中提取 request({ url, method }) 的信息。
+
+        Args:
+            node: AST 节点
+            constants: 文件内常量映射（如 divctUrl -> /xxx/api），
+                       用于展开模板字符串中的 ${var}
 
         返回 (method, url) 元组。
         """
@@ -281,9 +308,60 @@ class APIParser:
         if not url:
             url_match = re.search(r"""url:\s*`([^`]+)`""", text)
             if url_match:
-                url = url_match.group(1)
+                url = self._resolve_template(url_match.group(1), constants or {})
 
         return method, url
+
+    @staticmethod
+    def _resolve_template(template: str, constants: dict[str, str]) -> str:
+        """
+        展开模板字符串中的 ${常量} 引用。
+
+        例如 `${divctUrl}/order/query` 且 divctUrl=/hd-united-store/api
+        展开为 `/hd-united-store/api/order/query`。
+
+        Args:
+            template: 模板字符串内容（不含反引号）
+            constants: 常量映射
+
+        Returns:
+            展开后的字符串
+        """
+        def repl(match: re.Match) -> str:
+            var_name = match.group(1).strip()
+            return constants.get(var_name, match.group(0))
+
+        return re.sub(r"\$\{([^}]+)\}", repl, template)
+
+    @staticmethod
+    def _collect_constants(code: str) -> dict[str, str]:
+        """
+        收集文件内的简单字符串常量定义。
+
+        匹配形如:
+            const divctUrl = `${process.env.X}/hd-united-store/api`
+            const manager3 = `${process.env.Y}/api`
+        以及普通字符串常量 const A = '/foo'。
+
+        Args:
+            code: JavaScript 源码
+
+        Returns:
+            常量名到值的映射
+        """
+        constants: dict[str, str] = {}
+        # 匹配 const NAME = `...` 或 const NAME = '...' 或 const NAME = "..."
+        pattern = re.compile(
+            r"""const\s+([A-Za-z_$][\w$]*)\s*=\s*(`[^`]*`|'[^']*'|"[^"]*")""",
+        )
+        for match in pattern.finditer(code):
+            name = match.group(1)
+            raw = match.group(2)
+            value = raw.strip("`'\"")
+            # 把 ${process.env.XXX} 替换为占位（保留可读性）
+            value = re.sub(r"\$\{[^}]*process\.env[^}]*\}", "{ENV}", value)
+            constants[name] = value
+        return constants
 
     @staticmethod
     def _node_text(node: tree_sitter.Node) -> str:

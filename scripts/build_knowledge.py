@@ -90,7 +90,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def init_services() -> tuple[KnowledgeService, ChromaVectorStore]:
+def init_services() -> tuple[KnowledgeService, ChromaVectorStore, SQLiteKnowledgeRepository]:
     """初始化服务"""
     # 初始化数据库
     db_manager = DatabaseManager()
@@ -116,7 +116,7 @@ def init_services() -> tuple[KnowledgeService, ChromaVectorStore]:
         embedding=embedding_service,
     )
 
-    return knowledge_service, vectorstore
+    return knowledge_service, vectorstore, knowledge_repo
 
 
 async def build_knowledge(
@@ -147,13 +147,14 @@ async def build_knowledge(
 
     # 初始化服务
     print("\n📦 初始化服务...")
-    knowledge_service, vectorstore = init_services()
+    knowledge_service, vectorstore, knowledge_repo = init_services()
 
-    # 清空知识库
+    # 清空知识库（向量库 + 元数据库，二者需保持一致）
     if clear:
         print("\n🗑️  清空现有知识库...")
         await vectorstore.clear()
-        print("   ✅ 知识库已清空")
+        knowledge_repo.delete_all()
+        print("   ✅ 知识库已清空（向量库 + 元数据）")
 
     # 解析代码
     print(f"\n📖 解析项目: {project_root}")

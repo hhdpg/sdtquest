@@ -222,6 +222,23 @@ class SQLiteKnowledgeRepository:
             logger.error("删除知识条目失败 | id={} | error={}", item_id, str(e))
             return False
 
+    def delete_all(self) -> int:
+        """
+        删除所有知识条目（清空元数据表）。
+
+        Returns:
+            删除的条目数量
+        """
+        try:
+            cursor = self.db.execute("DELETE FROM knowledge_items")
+            self.db.commit()
+            deleted = cursor.rowcount
+            logger.info("知识元数据已清空 | deleted={}", deleted)
+            return deleted
+        except Exception as e:
+            logger.error("清空知识元数据失败 | error={}", str(e))
+            return 0
+
     def count(self) -> int:
         """
         统计知识条目总数

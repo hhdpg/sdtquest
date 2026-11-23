@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 
+import re
 from uuid import uuid4
 
 from loguru import logger
@@ -212,8 +213,9 @@ class KnowledgeBuilder:
         # 按钮操作
         if page.buttons:
             content_parts.append("\n【可用操作】")
+            api_names = self._collect_api_names(parse_result)
             for button in page.buttons:
-                button_desc = self._describe_button(button)
+                button_desc = self._describe_button(button, page, api_names)
                 content_parts.append(f"  - {button_desc}")
 
         # 表单字段
@@ -540,15 +542,105 @@ class KnowledgeBuilder:
     # 辅助方法
     # ========================================================================
 
-    def _describe_button(self, button: ButtonInfo) -> str:
-        """生成按钮描述"""
+    def _describe_button(
+        self,
+        button: ButtonInfo,
+        page: PageInfo | None = None,
+        api_names: set[str] | None = None,
+    ) -> str:
+        """
+        生成按钮描述。
+
+        会尝试把按钮的 @click 事件解析到对应 method，再关联该 method
+        调用的 API / store action，从而说明"这个按钮实际做了什么"。
+
+        Args:
+            button: 按钮信息
+            page: 所属页面（用于查找 method 与 API 关联）
+            api_names: 已知 API 函数名集合（用于过滤噪声调用）
+
+        Returns:
+            形如「查询」—— 触发 getList（调用 queryOrder）
+        """
         text = button.text or "未命名按钮"
         desc = f"「{text}」"
+
+        # 尝试解析按钮实际动作
+        action_desc = self._describe_button_action(button, page, api_names)
+        if action_desc:
+            desc += f" —— {action_desc}"
+
         if button.permission:
             desc += f" [权限: {button.permission}]"
-        if button.button_type:
-            desc += f" (样式: {button.button_type})"
         return desc
+
+    def _collect_api_names(self, parse_result: ParseResult | None) -> set[str]:
+        """
+        收集项目中所有已解析的 API 函数名。
+
+        用于过滤方法体内被误判为 API 的 JS 内置调用
+        （如 parse、map、require），只保留真正的业务接口。
+
+        Args:
+            parse_result: 完整解析结果
+
+        Returns:
+            API 函数名集合
+        """
+        if parse_result is None:
+            return set()
+        return {api.function_name for api in parse_result.api_definitions}
+
+    def _describe_button_action(
+        self,
+        button: ButtonInfo,
+        page: PageInfo | None,
+        api_names: set[str] | None = None,
+    ) -> str:
+        """
+        根据按钮的 @click 事件，找出它调用的 method 及其内部 API。
+
+        Args:
+            button: 按钮信息
+            page: 所属页面
+            api_names: 已知 API 函数名集合（用于过滤噪声调用）
+
+        Returns:
+            动作描述，如 "调用 queryOrder 查询数据"；无法解析时返回空串
+        """
+        if not button.event:
+            return ""
+
+        # 提取方法名：handleExport() / getList / handleManualPush('X')
+        method_name = re.split(r"[(\s.]", button.event.strip(), maxsplit=1)[0]
+        if not method_name:
+            return ""
+
+        # 在页面的 methods 中查找同名方法，取其调用的 API
+        methods = getattr(page, "methods", None) or []
+        target = next((m for m in methods if m.name == method_name), None)
+
+        if target is None:
+            return f"触发 {method_name}"
+
+        # 优先只展示确认属于业务接口的调用（与已解析 API 名取交集）
+        called = target.called_apis or []
+        if api_names:
+            matched = [c for c in called if c in api_names]
+            if matched:
+                called = matched
+
+        parts: list[str] = []
+        if called:
+            parts.append("调用 " + "、".join(called[:3]))
+        if target.dispatched_actions:
+            parts.append("dispatch " + "、".join(target.dispatched_actions[:2]))
+        if target.referenced_dialogs:
+            parts.append("打开 " + "、".join(target.referenced_dialogs[:2]))
+
+        if parts:
+            return f"触发 {method_name}（{'；'.join(parts)}）"
+        return f"触发 {method_name}"
 
     def _describe_form(self, form: FormInfo) -> str:
         """生成表单描述"""
@@ -587,15 +679,27 @@ class KnowledgeBuilder:
         page: PageInfo,
         parse_result: ParseResult | None,
     ) -> list[APIInfo]:
-        """查找页面关联的 API 接口"""
-        if parse_result is None or not page.api_calls:
+        """
+        查找页面关联的 API 接口。
+
+        只使用 method 级别实际捕获到的函数调用，并与 API 定义取交集。
+
+        注意: page.api_calls 记录的是页面内调用的函数名，其中大量是本地方法
+        （this.getList() 等），直接拿去匹配 API 定义会误关联到同名但无关的接口。
+        因此这里不使用 page.api_calls。
+        """
+        if parse_result is None:
             return []
 
-        api_map = {
-            api.function_name: api
-            for api in parse_result.api_definitions
-        }
-        return [api_map[name] for name in page.api_calls if name in api_map]
+        api_map = {api.function_name: api for api in parse_result.api_definitions}
+
+        names: list[str] = []
+        for method in getattr(page, "methods", None) or []:
+            for call in method.called_apis:
+                if call in api_map and call not in names:
+                    names.append(call)
+
+        return [api_map[name] for name in names]
 
     def _find_related_actions(
         self,

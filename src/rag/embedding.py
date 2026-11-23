@@ -23,6 +23,9 @@ class EmbeddingService:
     # bge-m3 查询时的 instruction prefix
     QUERY_INSTRUCTION = "Represent this sentence for searching relevant passages: "
 
+    # 向量化批大小：过大会让请求体超出 Ollama 限制（HTTP 400）
+    EMBED_BATCH_SIZE = 10
+
     def __init__(
         self,
         client: OllamaClient | None = None,
@@ -43,6 +46,8 @@ class EmbeddingService:
         """
         向量化文档（用于索引构建）
 
+        会自动分批，避免一次性提交过多文本导致 Ollama 请求体过大返回 400。
+
         Args:
             texts: 文档文本列表
 
@@ -55,14 +60,27 @@ class EmbeddingService:
         if not texts:
             return []
 
+        # 分批向量化：单批次文本过多会让请求体超出 Ollama 限制（HTTP 400）
+        batch_size = self.EMBED_BATCH_SIZE
+        all_embeddings: list[list[float]] = []
+
         try:
-            # 文档不需要添加 instruction prefix
-            embeddings = await self.client.embed(texts)
+            for start in range(0, len(texts), batch_size):
+                batch = texts[start:start + batch_size]
+                # 文档不需要添加 instruction prefix
+                embeddings = await self.client.embed(batch)
+                all_embeddings.extend(embeddings)
+                logger.debug(
+                    "文档向量化进度 | {}/{}",
+                    min(start + batch_size, len(texts)), len(texts),
+                )
+
             logger.debug(
                 "文档向量化完成 | count={} | dims={}",
-                len(texts), len(embeddings[0]) if embeddings else 0
+                len(all_embeddings),
+                len(all_embeddings[0]) if all_embeddings else 0,
             )
-            return embeddings
+            return all_embeddings
         except Exception as e:
             logger.error("文档向量化失败 | error={}", str(e))
             raise LLMServiceError(f"文档向量化失败: {e}") from e

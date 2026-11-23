@@ -12,6 +12,7 @@ from src.parser.models import (
     DialogInfo,
     FormField,
     FormInfo,
+    MethodInfo,
     PageInfo,
     ParseResult,
     TableColumn,
@@ -58,6 +59,9 @@ class TestKnowledgeBuilder:
             ],
             dialogs=[
                 DialogInfo(title="新建订单", visible="dialogVisible"),
+            ],
+            methods=[
+                MethodInfo(name="getList", called_apis=["getOrderList"]),
             ],
             store_modules=["order/fetchList"],
             api_calls=["getOrderList"],

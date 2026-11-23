@@ -273,6 +273,16 @@ class ScriptAnalyzer:
             "if", "for", "while", "switch", "catch", "return", "throw",
             "console", "JSON", "Math", "Date", "Promise",
             "setTimeout", "setInterval", "clearTimeout", "clearInterval",
+            # JS 内置 / 常见工具函数，避免被误判为业务接口
+            "parse", "stringify", "map", "filter", "forEach", "reduce",
+            "find", "findIndex", "some", "every", "push", "pop", "shift",
+            "unshift", "slice", "splice", "concat", "join", "split",
+            "trim", "replace", "includes", "indexOf", "toString",
+            "keys", "values", "entries", "assign", "freeze",
+            "require", "resolve", "reject", "then", "catch", "finally",
+            "querySelector", "getElementById", "addEventListener",
+            "encodeURIComponent", "decodeURIComponent",
+            "parseInt", "parseFloat", "isNaN", "alert", "confirm",
         }
         calls: list[str] = []
         self._walk_for_api_calls(body_node, calls, excluded)
