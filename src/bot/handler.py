@@ -169,7 +169,7 @@ class BotHandler:
             try:
                 await self.sender.send_text(
                     conversation_id,
-                    f"⏱️ 您的提问过于频繁，请 {self.rate_limit_seconds} 秒后再试。",
+                    "⏱️ 提问太快啦，请稍等几秒再问。",
                 )
             except Exception as e:
                 logger.error("发送限流提示失败 | error={}", str(e))
@@ -402,7 +402,8 @@ class BotHandler:
         """
         格式化回答内容。
 
-        在回答末尾附加引用来源和免责声明。
+        在回答末尾附加引用来源和免责声明。若 LLM 已自行输出来源/免责声明，
+        则不再重复追加（避免同一段内容出现两次）。
 
         Args:
             answer: 回答对象
@@ -410,7 +411,24 @@ class BotHandler:
         Returns:
             格式化后的 Markdown 文本
         """
-        parts = [answer.text]
+        text = answer.text.rstrip()
+
+        # 清理 LLM 可能自行输出的套话（来源、免责声明），统一由系统追加
+        text = re.sub(
+            r"\n*-{3,}\s*\n*\**参考来源\**[:：].*$",
+            "",
+            text,
+            flags=re.DOTALL | re.MULTILINE,
+        )
+        text = re.sub(r"\n*参考来源[:：].*$", "", text, flags=re.DOTALL | re.MULTILINE)
+        text = re.sub(
+            r"\n*>\s*[💡\s]*如有疑问请以实际系统(操作)?为准。?\s*$",
+            "",
+            text,
+        )
+        text = text.rstrip()
+
+        parts = [text]
 
         # 附加引用来源
         if answer.sources:

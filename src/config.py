@@ -59,7 +59,9 @@ class Settings(BaseSettings):
     SESSION_TTL_SECONDS: int = 300          # 会话超时 (5分钟)
 
     # ── 限流 ──
-    RATE_LIMIT_PER_USER: int = 60           # 同一用户提问间隔 (秒)
+    # 同一用户两次提问的最小间隔。仅用于防止误触/刷屏，取值应远小于
+    # 一次问答的耗时（9B 模型通常 2-10 秒），否则会误伤正常的连续追问。
+    RATE_LIMIT_PER_USER: int = 3            # 同一用户提问最小间隔 (秒)
 
     model_config = {
         "env_file": ".env",
