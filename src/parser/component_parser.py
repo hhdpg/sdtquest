@@ -63,8 +63,6 @@ class ComponentParser:
         Returns:
             (buttons, forms, tables, dialogs) 四元组
         """
-        from src.parser.models import ButtonInfo, DialogInfo, FormInfo, TableInfo
-
         if not template_content or not template_content.strip():
             return [], [], [], []
 

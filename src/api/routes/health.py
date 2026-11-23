@@ -3,6 +3,8 @@
 提供系统健康检查接口，用于监控和负载均衡器探测服务状态。
 """
 
+from pathlib import Path
+
 from fastapi import APIRouter
 from loguru import logger
 
@@ -42,9 +44,6 @@ async def detailed_health_check() -> dict:
     Returns:
         详细状态信息字典
     """
-    import os
-    from pathlib import Path
-
     # 检查各组件状态
     checks = {
         "app": _check_app(),
@@ -76,9 +75,12 @@ def _check_database() -> dict[str, str]:
 
         db_manager = get_db_manager()
         db_path = Path(settings.ANALYTICS_DB_PATH)
-        if db_path.exists():
-            return {"status": "ok", "path": str(db_path)}
-        return {"status": "ok", "path": str(db_path), "note": "数据库文件不存在，将在首次写入时创建"}
+        if not db_path.exists():
+            return {"status": "ok", "path": str(db_path), "note": "数据库文件不存在，将在首次写入时创建"}
+
+        # 真正探活：执行一次轻量查询，确认连接可用
+        db_manager.get_connection().execute("SELECT 1").fetchone()
+        return {"status": "ok", "path": str(db_path)}
     except Exception as e:
         return {"status": "error", "error": str(e)}
 

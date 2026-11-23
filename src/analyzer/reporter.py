@@ -187,6 +187,7 @@ class ReportGenerator:
         # ── 标题 ──
         lines.append(f"# 🤖 智能问答{period}")
         lines.append("")
+        lines.append(f"**报告日期**: {today}")
         lines.append(f"**统计周期**: {summary.start_date} ~ {summary.end_date}")
         lines.append(f"**生成时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         lines.append("")
@@ -194,8 +195,8 @@ class ReportGenerator:
         # ── 概览 ──
         lines.append("## 📊 概览")
         lines.append("")
-        lines.append(f"| 指标 | 数值 |")
-        lines.append(f"|------|------|")
+        lines.append("| 指标 | 数值 |")
+        lines.append("|------|------|")
         lines.append(f"| 问题总数 | {summary.total} |")
         lines.append(f"| 活跃用户 | {summary.active_users} |")
         lines.append(f"| 平均置信度 | {summary.avg_confidence:.1%} |")
@@ -271,7 +272,7 @@ class ReportGenerator:
 
         # ── 页脚 ──
         lines.append("---")
-        lines.append(f"*报告由智能问答机器人自动生成*")
+        lines.append("*报告由智能问答机器人自动生成*")
 
         return "\n".join(lines)
 

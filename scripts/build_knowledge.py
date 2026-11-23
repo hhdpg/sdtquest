@@ -51,8 +51,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--project-root",
         type=str,
-        required=True,
-        help="前端项目根目录路径",
+        default=settings.PARSER_DEFAULT_PROJECT_ROOT or None,
+        required=not settings.PARSER_DEFAULT_PROJECT_ROOT,
+        help="前端项目根目录路径（默认取 PARSER_DEFAULT_PROJECT_ROOT 配置）",
     )
 
     parser.add_argument(
@@ -202,7 +203,7 @@ async def build_knowledge(
     latency = time.time() - start_time
 
     print("\n" + "=" * 60)
-    print(f"✅ 知识库构建完成")
+    print("✅ 知识库构建完成")
     print(f"   知识条目: {len(knowledge_items)} 条")
     print(f"   耗时: {latency:.1f} 秒")
     print("=" * 60)

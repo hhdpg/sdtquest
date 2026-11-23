@@ -34,6 +34,7 @@ from src.domain.exceptions import (
 from src.domain.models import Answer, Message, Question
 from src.domain.ports import LLMClient, GenerateOptions
 from src.rag.pipeline import RAGPipeline, RAGResult
+from src.shared.utils import strip_think_tags
 
 
 # ============================================================================
@@ -445,9 +446,7 @@ class QAService:
         result = answer_text.strip()
 
         # 去除 <think>...</think> 标签（部分模型会输出思考过程）
-        if "<think>" in result:
-            result = re.sub(r"<think>.*?</think>\s*", "", result, flags=re.DOTALL)
-            result = result.strip()
+        result = strip_think_tags(result)
 
         # 操作指南类：确保步骤编号格式一致（1. 2. 3.）
         if rag_result.category == QuestionCategory.OPERATION_GUIDE:

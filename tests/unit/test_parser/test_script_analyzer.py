@@ -1,6 +1,5 @@
 """Script 区块分析器单元测试"""
 
-from pathlib import Path
 
 import pytest
 

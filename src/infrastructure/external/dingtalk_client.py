@@ -3,7 +3,6 @@
 封装钉钉开放平台 API 调用，支持消息发送、更新等操作。
 """
 
-import asyncio
 from typing import Any
 
 import httpx
@@ -32,6 +31,7 @@ class DingTalkClient:
         self,
         app_key: str | None = None,
         app_secret: str | None = None,
+        robot_code: str | None = None,
     ):
         """
         初始化钉钉客户端
@@ -39,9 +39,13 @@ class DingTalkClient:
         Args:
             app_key: 应用 AppKey，默认从配置读取
             app_secret: 应用 AppSecret，默认从配置读取
+            robot_code: 机器人编码，默认从配置读取；未配置时回退为 app_key
         """
         self.app_key = app_key or settings.DINGTALK_APP_KEY
         self.app_secret = app_secret or settings.DINGTALK_APP_SECRET
+        # 钉钉规范中 robotCode 与 appKey 是两个独立标识，
+        # 单机器人应用二者通常相同，但多机器人场景必须使用真实的 robotCode。
+        self.robot_code = robot_code or settings.DINGTALK_BOT_CODE or self.app_key
         self._access_token: str | None = None
         self._token_expires_at: float = 0
 
@@ -173,7 +177,7 @@ class DingTalkClient:
                         "msgParam": str(msg_content).replace("'", '"'),
                         "msgKey": self._get_msg_key(msg_type),
                         "openConversationId": open_conversation_id,
-                        "robotCode": self.app_key,
+                        "robotCode": self.robot_code,
                     },
                 )
                 response.raise_for_status()
@@ -246,7 +250,7 @@ class DingTalkClient:
                     },
                     json={
                         "processQueryKey": message_id,
-                        "robotCode": self.app_key,
+                        "robotCode": self.robot_code,
                     },
                 )
                 response.raise_for_status()

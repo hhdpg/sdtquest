@@ -6,7 +6,7 @@
 
 from typing import AsyncIterator, Protocol
 
-from src.domain.models import Answer, KnowledgeItem, Message, Question
+from src.domain.models import Answer, KnowledgeItem, Question
 from src.domain.enums import QuestionCategory
 
 

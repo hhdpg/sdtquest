@@ -4,9 +4,7 @@
 """
 
 import json
-import tempfile
-from datetime import datetime, timedelta
-from pathlib import Path
+from datetime import datetime
 
 import pytest
 
@@ -216,7 +214,10 @@ class TestSQLiteQuestionRepoConversion:
             (id, question, answer, category, sender_id, conversation_id, confidence, status, sources, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            ("q_unknown", "问题", "回答", "unknown_category", "user", "conv", 0.5, "success", "[]", datetime.now().isoformat()),
+            (
+                "q_unknown", "问题", "回答", "unknown_category", "user",
+                "conv", 0.5, "success", "[]", datetime.now().isoformat(),
+            ),
         )
         db.commit()
 

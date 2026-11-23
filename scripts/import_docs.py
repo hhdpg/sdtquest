@@ -233,7 +233,7 @@ async def import_docs(
     latency = time.time() - start_time
 
     print("\n" + "=" * 60)
-    print(f"✅ 文档导入完成")
+    print("✅ 文档导入完成")
     print(f"   导入条目: {total_items} 条")
     print(f"   耗时: {latency:.1f} 秒")
     print("=" * 60)

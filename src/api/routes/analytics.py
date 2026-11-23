@@ -10,8 +10,6 @@
 - POST /api/analytics/report: 生成并保存日报
 """
 
-from typing import Any
-
 from fastapi import APIRouter, Depends, Query
 from loguru import logger
 from pydantic import BaseModel, Field

@@ -128,7 +128,7 @@ modules/
 | 组件 | 选型 | 用途 |
 |------|------|------|
 | LLM 运行时 | Ollama | 本地模型服务 |
-| 生成模型 | qwen3.5:35b-a3b-instruct-4bit | 文本生成 |
+| 生成模型 | qwen3.5:9b | 文本生成 |
 | Embedding 模型 | bge-m3 | 文本向量化 |
 | RAG 框架 | LlamaIndex | 检索管道编排 |
 | 向量数据库 | ChromaDB | 向量存储与检索 |
@@ -983,7 +983,7 @@ class Settings(BaseSettings):
 
     # ── Ollama ──
     OLLAMA_BASE_URL: str = "http://localhost:11434"
-    OLLAMA_MODEL: str = "qwen3.5:35b-a3b-instruct-4bit"
+    OLLAMA_MODEL: str = "qwen3.5:9b"
     OLLAMA_EMBEDDING_MODEL: str = "bge-m3"
     OLLAMA_TIMEOUT: int = 120               # 秒
     OLLAMA_MAX_CONCURRENT: int = 2          # 最大并发推理

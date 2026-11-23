@@ -4,7 +4,6 @@
 """
 
 import pytest
-from unittest.mock import patch
 
 from src.domain.enums import KnowledgeType, QuestionCategory
 from src.domain.models import KnowledgeItem, Message

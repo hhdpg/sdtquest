@@ -30,6 +30,7 @@ from src.parser.models import (
     MethodInfo,
     OperationFlow,
     OperationStep,
+    ParseResult,
     SFCParseResult,
 )
 from src.parser.script_analyzer import ScriptAnalyzer
@@ -549,7 +550,7 @@ class VueProjectParser:
         Raises:
             ParserError: 项目目录不存在或关键解析失败
         """
-        from src.parser.models import PageInfo, ParseResult
+        from src.parser.models import ParseResult
 
         if not self.project_root.exists():
             raise ParserError(f"项目目录不存在: {self.project_root}")

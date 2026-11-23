@@ -13,7 +13,6 @@
     >>> msg_id = await sender.send_text("conv_123", "Hello!")
 """
 
-import json
 from typing import Any
 
 from loguru import logger

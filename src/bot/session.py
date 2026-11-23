@@ -13,7 +13,6 @@
     >>> history = manager.get_history("conv_123")
 """
 
-import asyncio
 import threading
 from datetime import datetime
 from typing import Any

@@ -3,7 +3,6 @@
 测试 OllamaClient 的生成、嵌入、流式生成等功能（mock HTTP 调用）。
 """
 
-import asyncio
 
 import httpx
 import pytest
@@ -21,7 +20,7 @@ class TestOllamaClientInit:
         """测试默认初始化"""
         client = OllamaClient()
         assert client.base_url == "http://localhost:11434"
-        assert client.model == "qwen3.5:35b-a3b-instruct-4bit"
+        assert client.model == "qwen3.5:9b"
         assert client.timeout == 120
         assert client.max_concurrent == 2
 
@@ -85,6 +84,48 @@ class TestOllamaClientGenerate:
             payload = call_args[1]["json"]
             assert payload["options"]["temperature"] == 0.5
             assert payload["options"]["num_predict"] == 100
+
+    @pytest.mark.asyncio
+    async def test_generate_thinking_exhausted_raises(self):
+        """思考模型的思考内容耗尽 token 配额时应明确报错，而非静默返回空串"""
+        with patch("src.llm.client.httpx.AsyncClient") as mock_client_cls:
+            mock_response = MagicMock()
+            mock_response.json.return_value = {
+                "response": "",
+                "thinking": "思考过程...",
+                "done_reason": "length",
+            }
+            mock_response.raise_for_status = MagicMock()
+
+            mock_client = AsyncMock()
+            mock_client.post = AsyncMock(return_value=mock_response)
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
+            mock_client_cls.return_value = mock_client
+
+            client = OllamaClient()
+            with pytest.raises(LLMServiceError, match="思考过程"):
+                await client.generate("提示")
+
+    @pytest.mark.asyncio
+    async def test_generate_sends_think_flag(self):
+        """配置中关闭思考模式时应下发给 Ollama"""
+        with patch("src.llm.client.httpx.AsyncClient") as mock_client_cls:
+            mock_response = MagicMock()
+            mock_response.json.return_value = {"response": "文本"}
+            mock_response.raise_for_status = MagicMock()
+
+            mock_client = AsyncMock()
+            mock_client.post = AsyncMock(return_value=mock_response)
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
+            mock_client_cls.return_value = mock_client
+
+            client = OllamaClient(think=False)
+            await client.generate("提示")
+
+            payload = mock_client.post.call_args[1]["json"]
+            assert payload["think"] is False
 
     @pytest.mark.asyncio
     async def test_generate_timeout_raises(self):

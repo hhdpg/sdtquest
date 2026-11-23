@@ -22,7 +22,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from loguru import logger
 
-from src.parser import KnowledgeBuilder, VueProjectParser
+from src.config import settings
+from src.parser import VueProjectParser
 from src.parser.models import ParseResult
 
 
@@ -42,8 +43,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--project-root",
         type=str,
-        required=True,
-        help="前端项目根目录路径",
+        default=settings.PARSER_DEFAULT_PROJECT_ROOT or None,
+        required=not settings.PARSER_DEFAULT_PROJECT_ROOT,
+        help="前端项目根目录路径（默认取 PARSER_DEFAULT_PROJECT_ROOT 配置）",
     )
 
     parser.add_argument(

@@ -6,8 +6,6 @@
 - POST /api/chat: 发送问题并获取回答
 """
 
-from typing import Any
-
 from fastapi import APIRouter, Depends
 from loguru import logger
 from pydantic import BaseModel, Field

@@ -8,7 +8,6 @@
 
 import asyncio
 import sqlite3
-import tempfile
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -430,7 +429,6 @@ class TestDatabaseWalModeFix:
         conn.commit()
 
         db_path = Path(db_manager.db_path)
-        wal_file = db_path.parent / f"{db_path.name}-wal"
 
         # WAL 模式下，写入后可能产生 -wal 文件
         # 注意: 如果所有数据已 checkpoint 到主文件，-wal 可能为空或不存在

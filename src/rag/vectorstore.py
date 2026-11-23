@@ -84,28 +84,28 @@ class ChromaVectorStore:
             documents = [item.to_document_string() for item in items]
             metadatas = [item.get_metadata() for item in items]
 
-            # 如果有预计算的 embedding，直接使用
+            # 集合由外部 embedding（bge-m3, 1024 维）创建，
+            # 若缺少 embedding 而交给 ChromaDB 默认函数（384 维）会触发维度冲突，
+            # 因此这里要求调用方先向量化，避免静默写入错误维度的数据。
             embeddings = [item.embedding for item in items]
-            if all(e is not None for e in embeddings):
-                self.collection.add(
-                    ids=ids,
-                    documents=documents,
-                    metadatas=metadatas,
-                    embeddings=embeddings,
+            if any(e is None for e in embeddings):
+                raise VectorStoreError(
+                    "知识条目缺少 embedding，请先调用向量化（embed_documents）后再写入"
                 )
-            else:
-                # 让 ChromaDB 使用默认的 embedding 函数
-                # 或者我们可以手动计算
-                self.collection.add(
-                    ids=ids,
-                    documents=documents,
-                    metadatas=metadatas,
-                )
+
+            self.collection.add(
+                ids=ids,
+                documents=documents,
+                metadatas=metadatas,
+                embeddings=embeddings,
+            )
 
             logger.info(
                 "添加文档到向量库 | count={} | total={}",
                 len(items), self.collection.count()
             )
+        except VectorStoreError:
+            raise
         except Exception as e:
             logger.error("添加文档失败 | error={}", str(e))
             raise VectorStoreError(f"添加文档失败: {e}") from e
@@ -176,11 +176,45 @@ class ChromaVectorStore:
         if not query:
             return []
 
+        scored = await self.search_scored(
+            query=query,
+            top_k=top_k,
+            threshold=threshold,
+            filters=filters,
+        )
+        return [item for item, _ in scored]
+
+    async def search_scored(
+        self,
+        query: list[float],
+        top_k: int = 5,
+        threshold: float = 0.0,
+        filters: dict[str, Any] | None = None,
+    ) -> list[tuple[KnowledgeItem, float]]:
+        """
+        按向量检索相似文档，并返回相似度分数。
+
+        与 search() 的区别在于保留每条结果的余弦相似度（0-1），
+        供上层做阈值判断与融合排序。
+
+        Args:
+            query: 查询向量
+            top_k: 返回结果数量
+            threshold: 相似度阈值（余弦相似度，0-1）
+            filters: 元数据过滤条件
+
+        Returns:
+            (知识条目, 相似度分数) 列表，按相似度降序
+
+        Raises:
+            VectorStoreError: 检索失败
+        """
+        if not query:
+            return []
+
         try:
-            # 构建查询条件
             where_filter = self._build_where_filter(filters) if filters else None
 
-            # 执行查询
             results = self.collection.query(
                 query_embeddings=[query],
                 n_results=top_k,
@@ -188,16 +222,13 @@ class ChromaVectorStore:
                 include=["documents", "metadatas", "distances"],
             )
 
-            # 解析结果
-            items = []
+            scored: list[tuple[KnowledgeItem, float]] = []
             if results and results["ids"] and results["ids"][0]:
                 for i, doc_id in enumerate(results["ids"][0]):
-                    # ChromaDB 返回的是距离，需要转换为相似度
-                    distance = results["distances"][0][i] if results["distances"] else 0
-                    # 余弦距离 = 1 - 余弦相似度
-                    similarity = 1 - distance
+                    # ChromaDB 返回余弦距离，相似度 = 1 - 距离
+                    distance = results["distances"][0][i] if results["distances"] else 0.0
+                    similarity = 1.0 - distance
 
-                    # 应用阈值过滤
                     if similarity < threshold:
                         continue
 
@@ -205,67 +236,81 @@ class ChromaVectorStore:
                     document = results["documents"][0][i] if results["documents"] else ""
 
                     item = self._metadata_to_item(doc_id, metadata, document)
-                    items.append(item)
+                    scored.append((item, similarity))
 
             logger.debug(
                 "向量检索完成 | top_k={} | threshold={} | found={}",
-                top_k, threshold, len(items)
+                top_k, threshold, len(scored)
             )
-            return items
+            return scored
 
         except Exception as e:
             logger.error("向量检索失败 | error={}", str(e))
             raise VectorStoreError(f"向量检索失败: {e}") from e
 
-    async def search_with_text(
+    async def search_by_keywords(
         self,
-        query_text: str,
+        keywords: list[str],
         top_k: int = 5,
-        threshold: float = 0.0,
         filters: dict[str, Any] | None = None,
     ) -> list[KnowledgeItem]:
         """
-        按文本检索相似文档（使用 ChromaDB 默认 embedding）
+        按关键词做字面量检索（稀疏检索）。
+
+        使用 ChromaDB 的 where_document $contains 在文档正文中匹配关键词，
+        不依赖 embedding，因此不会与 bge-m3 的向量维度产生冲突。
 
         Args:
-            query_text: 查询文本
+            keywords: 关键词列表，多个关键词以 OR 关系匹配
             top_k: 返回结果数量
-            threshold: 相似度阈值
             filters: 元数据过滤条件
 
         Returns:
-            知识条目列表
-        """
-        try:
-            where_filter = self._build_where_filter(filters) if filters else None
+            命中的知识条目列表
 
-            results = self.collection.query(
-                query_texts=[query_text],
-                n_results=top_k,
-                where=where_filter,
-                include=["documents", "metadatas", "distances"],
+        Raises:
+            VectorStoreError: 检索失败
+        """
+        clean_keywords = [k.strip() for k in keywords if k and k.strip()]
+        if not clean_keywords:
+            return []
+
+        try:
+            document_filter: dict[str, Any]
+            if len(clean_keywords) == 1:
+                document_filter = {"$contains": clean_keywords[0]}
+            else:
+                document_filter = {
+                    "$or": [{"$contains": k} for k in clean_keywords]
+                }
+
+            where_meta = self._build_where_filter(filters) if filters else None
+
+            # 注意: 文档内字面匹配属于 where_document，元数据过滤属于 where，
+            # 二者是并列参数，不能混在同一个 where 条件里。
+            results = self.collection.get(
+                where=where_meta,
+                where_document=document_filter,
+                limit=top_k,
+                include=["documents", "metadatas"],
             )
 
-            items = []
-            if results and results["ids"] and results["ids"][0]:
-                for i, doc_id in enumerate(results["ids"][0]):
-                    distance = results["distances"][0][i] if results["distances"] else 0
-                    similarity = 1 - distance
+            items: list[KnowledgeItem] = []
+            if results and results["ids"]:
+                for i, doc_id in enumerate(results["ids"]):
+                    metadata = results["metadatas"][i] if results["metadatas"] else {}
+                    document = results["documents"][i] if results["documents"] else ""
+                    items.append(self._metadata_to_item(doc_id, metadata, document))
 
-                    if similarity < threshold:
-                        continue
-
-                    metadata = results["metadatas"][0][i] if results["metadatas"] else {}
-                    document = results["documents"][0][i] if results["documents"] else ""
-
-                    item = self._metadata_to_item(doc_id, metadata, document)
-                    items.append(item)
-
+            logger.debug(
+                "关键词检索完成 | keywords={} | found={}",
+                clean_keywords, len(items)
+            )
             return items
 
         except Exception as e:
-            logger.error("文本检索失败 | error={}", str(e))
-            raise VectorStoreError(f"文本检索失败: {e}") from e
+            logger.error("关键词检索失败 | error={}", str(e))
+            raise VectorStoreError(f"关键词检索失败: {e}") from e
 
     async def delete(self, ids: list[str]) -> None:
         """

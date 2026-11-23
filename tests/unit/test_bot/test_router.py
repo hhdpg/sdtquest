@@ -8,7 +8,7 @@
 """
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 from src.bot.handler import BotHandler
 from src.bot.router import BotRouter

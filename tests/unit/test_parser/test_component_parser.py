@@ -3,7 +3,6 @@
 import pytest
 
 from src.parser.component_parser import ComponentParser
-from src.parser.models import ButtonInfo, DialogInfo, FormInfo, TableInfo
 
 
 class TestComponentParser:

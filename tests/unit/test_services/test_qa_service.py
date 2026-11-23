@@ -4,11 +4,10 @@
 """
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 from src.domain.enums import AnswerStatus, QuestionCategory
 from src.domain.exceptions import (
-    KnowledgeNotFoundError,
     LLMServiceError,
     QuestionProcessingError,
 )

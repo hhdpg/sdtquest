@@ -13,7 +13,7 @@
 ## 技术栈
 
 - **后端框架**: FastAPI + Uvicorn
-- **LLM 运行时**: Ollama (qwen3.5:35b-a3b-instruct-4bit)
+- **LLM 运行时**: Ollama (qwen3.5:9b)
 - **Embedding 模型**: bge-m3
 - **向量数据库**: ChromaDB
 - **代码解析**: Tree-sitter + BeautifulSoup4
@@ -48,7 +48,7 @@ vim .env
 ollama serve
 
 # 拉取所需模型
-ollama pull qwen3.5:35b-a3b-instruct-4bit
+ollama pull qwen3.5:9b
 ollama pull bge-m3
 ```
 

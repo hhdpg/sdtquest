@@ -4,11 +4,10 @@
 """
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 
 from src.domain.enums import AnswerStatus, KnowledgeType, QuestionCategory
-from src.domain.models import Answer, KnowledgeItem, Message, Question
-from src.domain.ports import GenerateOptions
+from src.domain.models import Answer, KnowledgeItem
 
 
 class TestQAPipelineIntegration:
@@ -19,7 +18,6 @@ class TestQAPipelineIntegration:
         """测试完整问答流程（mock LLM 和 VectorStore）"""
         from src.services.qa_service import QAService
         from src.rag.pipeline import RAGPipeline, RAGResult
-        from src.rag.context import ContextAssembler
         from unittest.mock import MagicMock
 
         # Mock LLM
@@ -207,10 +205,9 @@ class TestAnalyticsIntegration:
         assert summary["avg_confidence"] > 0
         assert summary["success_rate"] == 1.0
 
-        # 获取高频问题
-        top = await service.get_top_questions(days=7, limit=5)
-        # 每个问题只出现 1 次，min_count 默认为 2，所以为空
-        # 这里验证方法不抛出异常即可
+        # 获取高频问题（验证方法不抛出异常即可）
+        # 每个问题只出现 1 次，min_count 默认为 2，所以结果为空
+        await service.get_top_questions(days=7, limit=5)
 
         # 生成日报
         report = await service.generate_daily_report(days=1)
@@ -231,7 +228,6 @@ class TestKnowledgeServiceIntegration:
         """测试文档导入流程"""
         from unittest.mock import MagicMock, AsyncMock
         from src.services.knowledge_service import KnowledgeService
-        from src.domain.enums import KnowledgeType
 
         # 创建测试文件
         test_file = tmp_path / "test.md"

@@ -26,7 +26,7 @@ from loguru import logger
 from src.bot.sender import DingTalkMessageSender
 from src.bot.session import SessionManager
 from src.config import settings
-from src.domain.exceptions import DingTalkAPIError, LLMServiceError, QuestionProcessingError
+from src.domain.exceptions import LLMServiceError, QuestionProcessingError
 from src.domain.models import Answer, Message
 from src.services.qa_service import QAService
 

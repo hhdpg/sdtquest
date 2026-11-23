@@ -10,12 +10,11 @@
 
 import time
 from datetime import datetime, timedelta
-from unittest.mock import patch
 
 import pytest
 
 from src.bot.session import SessionManager
-from src.domain.models import Conversation, Message
+from src.domain.models import Message
 
 
 class TestSessionManager:

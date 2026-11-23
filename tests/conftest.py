@@ -8,8 +8,6 @@
 """
 
 import asyncio
-import os
-import tempfile
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
@@ -17,7 +15,6 @@ import pytest
 
 from src.domain.enums import AnswerStatus, KnowledgeType, QuestionCategory
 from src.domain.models import Answer, KnowledgeItem, Message, Question
-from src.domain.ports import GenerateOptions
 
 
 # ============================================================================

@@ -7,10 +7,7 @@ from loguru import logger
 
 from src.domain.enums import QuestionCategory
 from src.domain.models import KnowledgeItem, Message
-from src.llm.prompts.qa import (
-    QA_SYSTEM_PROMPT,
-    build_qa_prompt,
-)
+from src.llm.prompts.qa import build_qa_prompt
 
 
 class ContextAssembler:

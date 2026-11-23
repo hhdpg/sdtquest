@@ -37,6 +37,7 @@ class OllamaClient:
         model: str | None = None,
         timeout: int | None = None,
         max_concurrent: int | None = None,
+        think: bool | None = None,
     ):
         """
         初始化 Ollama 客户端
@@ -46,18 +47,20 @@ class OllamaClient:
             model: 默认模型名称，默认从配置读取
             timeout: 请求超时时间（秒），默认从配置读取
             max_concurrent: 最大并发数，默认从配置读取
+            think: 是否启用思考模式（None 表示不显式指定，交由模型决定）
         """
         self.base_url = (base_url or settings.OLLAMA_BASE_URL).rstrip("/")
         self.model = model or settings.OLLAMA_MODEL
         self.timeout = timeout or settings.OLLAMA_TIMEOUT
         self.max_concurrent = max_concurrent or settings.OLLAMA_MAX_CONCURRENT
+        self.think = settings.OLLAMA_THINK if think is None else think
 
         # 并发控制信号量
         self._semaphore = asyncio.Semaphore(self.max_concurrent)
 
         logger.info(
-            "OllamaClient 初始化 | base_url={} | model={} | timeout={}s | max_concurrent={}",
-            self.base_url, self.model, self.timeout, self.max_concurrent
+            "OllamaClient 初始化 | base_url={} | model={} | timeout={}s | max_concurrent={} | think={}",
+            self.base_url, self.model, self.timeout, self.max_concurrent, self.think
         )
 
     async def generate(
@@ -99,6 +102,10 @@ class OllamaClient:
                 if opts.stop:
                     payload["options"]["stop"] = opts.stop
 
+                # 显式指定思考模式（仅在客户端配置了 think 时下发）
+                if self.think is not None:
+                    payload["think"] = self.think
+
                 async with httpx.AsyncClient(timeout=self.timeout) as client:
                     response = await client.post(
                         f"{self.base_url}/api/generate",
@@ -108,6 +115,19 @@ class OllamaClient:
                     result = response.json()
 
                 text = result.get("response", "")
+                # qwen3.5 等思考模型会把推理过程放在独立的 thinking 字段，
+                # 若 num_predict 被思考消耗完，response 会为空，此时不能静默返回空串。
+                if not text.strip() and result.get("thinking"):
+                    logger.warning(
+                        "LLM 回答为空但存在思考内容 | model={} | done_reason={} | "
+                        "建议调大 LLM_MAX_TOKENS 或关闭思考模式",
+                        target_model, result.get("done_reason")
+                    )
+                    raise LLMServiceError(
+                        "LLM 未产出正式回答（思考过程已耗尽 token 配额），"
+                        "请调大 LLM_MAX_TOKENS 或关闭思考模式"
+                    )
+
                 logger.debug(
                     "LLM 生成完成 | model={} | tokens={} | text_len={}",
                     target_model, result.get("eval_count", 0), len(text)

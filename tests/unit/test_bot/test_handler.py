@@ -9,9 +9,8 @@
 - 回答格式化
 """
 
-import asyncio
 import time
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -19,7 +18,7 @@ from src.bot.handler import BotHandler
 from src.bot.sender import DingTalkMessageSender
 from src.bot.session import SessionManager
 from src.domain.enums import AnswerStatus, QuestionCategory
-from src.domain.models import Answer, Message
+from src.domain.models import Answer
 from src.services.qa_service import QAService
 
 

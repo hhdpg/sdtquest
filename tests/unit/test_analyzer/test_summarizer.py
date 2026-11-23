@@ -5,7 +5,7 @@
 
 import pytest
 from datetime import datetime
-from unittest.mock import Mock, MagicMock
+from unittest.mock import Mock
 
 from src.analyzer.summarizer import QuestionSummarizer, SummaryResult, CategoryStats
 from src.domain.enums import AnswerStatus, QuestionCategory

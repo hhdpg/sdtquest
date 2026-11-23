@@ -19,7 +19,6 @@ from typing import Any
 from loguru import logger
 
 from src.bot.handler import BotHandler
-from src.config import settings
 from src.domain.exceptions import DingTalkAPIError
 from src.infrastructure.external.dingtalk_client import DingTalkClient
 

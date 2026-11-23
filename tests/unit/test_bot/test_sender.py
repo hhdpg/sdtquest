@@ -9,7 +9,7 @@
 """
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 from src.bot.sender import DingTalkMessageSender
 from src.domain.exceptions import DingTalkAPIError
@@ -178,7 +178,7 @@ class TestDingTalkMessageSender:
     @pytest.mark.asyncio
     async def test_send_error_message_default(self, sender: DingTalkMessageSender, mock_client: MagicMock) -> None:
         """测试发送默认错误消息"""
-        msg_id = await sender.send_error_message("conv_123")
+        await sender.send_error_message("conv_123")
 
         mock_client.send_text.assert_called_once()
         call_args = mock_client.send_text.call_args
@@ -187,7 +187,7 @@ class TestDingTalkMessageSender:
     @pytest.mark.asyncio
     async def test_send_error_message_custom(self, sender: DingTalkMessageSender, mock_client: MagicMock) -> None:
         """测试发送自定义错误消息"""
-        msg_id = await sender.send_error_message("conv_123", "自定义错误")
+        await sender.send_error_message("conv_123", "自定义错误")
 
         mock_client.send_text.assert_called_once()
         call_args = mock_client.send_text.call_args
@@ -213,7 +213,6 @@ class TestDingTalkMessageSender:
 
     def test_implements_message_sender_protocol(self) -> None:
         """测试实现 MessageSender 协议"""
-        from src.domain.ports import MessageSender
 
         mock_client = MagicMock(spec=DingTalkClient)
         sender = DingTalkMessageSender(client=mock_client)
