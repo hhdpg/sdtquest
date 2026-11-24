@@ -9,7 +9,7 @@
   · 输出命中报告
 
 用法:
-    uv run scripts/eval_cards.py --dir data/cards/_demo
+    uv run scripts/eval_cards.py --dir data/cards
     uv run scripts/eval_cards.py --dir data/cards --threshold 5
 """
 
@@ -174,7 +174,7 @@ def run_real_questions(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="验证卡片召回效果")
-    parser.add_argument("--dir", type=str, default="data/cards/_demo")
+    parser.add_argument("--dir", type=str, default="data/cards")
     parser.add_argument("--top-k", type=int, default=3)
     parser.add_argument("--threshold", type=float, default=None,
                         help="命中阈值（默认取 config/retrieval.yaml）")

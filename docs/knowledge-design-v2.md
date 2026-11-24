@@ -738,23 +738,23 @@ dws drive download --node <nodeId> --output "/tmp/manuals/<名称>.docx"
 
 ```
 data/cards/                       # 卡片源文件（YAML，可版本控制）
-├── order/
-│   ├── glossary/
-│   ├── task/
-│   ├── rule/
-│   ├── state/
-│   ├── trouble/
-│   └── flow/
-├── waybill/
-├── product/
-└── common/
-    ├── trouble/
-    └── faq/
+├── order/        # 订单域（22 张）
+├── sdt/          # 顺店通通用（11 张）
+├── hr/           # 人力资源 / HRMI（6 张）
+├── _draft/       # 线上未命中/点踩生成的草稿卡（待人工评审）
+└── ...
 ```
+
+**按业务域分目录，不再按卡型建二级目录。**
+
+原因：`card_id` 已采用 `{module}-{cardtype}-{slug}` 的格式
+（如 `order-task-create`、`sdt-rule-tc-store-config`），
+卡型信息已在文件名中体现，再建一层目录只是重复，反而增加查找成本。
 
 - 卡片以 YAML 存于仓库，便于 code review、diff、回滚。
 - 构建脚本读取 YAML → 校验 → 向量化 → 入库。
-- 线上「点踩/未命中」生成的草稿卡也走同一目录（`data/cards/_draft/`），人工评审后移入正式目录。
+- 线上「点踩/未命中」生成的草稿卡放 `_draft/`，人工评审后移入所属业务域目录。
+- 新增业务只需新建一个域名目录（如 `data/cards/finance/`）。
 
 ---
 

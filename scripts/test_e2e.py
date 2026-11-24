@@ -6,8 +6,8 @@
   · 本脚本测完整链路：YAML → embedding → ChromaDB → HybridRetriever
 
 用法:
-    uv run scripts/test_e2e.py --dir data/cards/_demo
-    uv run scripts/test_e2e.py --dir data/cards/_demo --rebuild
+    uv run scripts/test_e2e.py --dir data/cards
+    uv run scripts/test_e2e.py --dir data/cards --rebuild
 """
 
 import argparse
@@ -176,7 +176,7 @@ async def main_async(args) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="端到端测试")
-    parser.add_argument("--dir", type=str, default="data/cards/_demo")
+    parser.add_argument("--dir", type=str, default="data/cards")
     parser.add_argument("--rebuild", action="store_true", help="重建索引")
     parser.add_argument("--no-build", action="store_true", help="跳过建库")
     args = parser.parse_args()

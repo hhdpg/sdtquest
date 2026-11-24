@@ -5,7 +5,7 @@
 模型是否会编造具体值。
 
 用法:
-    uv run scripts/test_hallucination.py --dir data/cards/_demo
+    uv run scripts/test_hallucination.py --dir data/cards
 """
 
 import argparse
@@ -154,7 +154,7 @@ def check_hallucination(answer: str) -> tuple[bool, list[str]]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="边界与编造测试")
-    parser.add_argument("--dir", type=str, default="data/cards/_demo")
+    parser.add_argument("--dir", type=str, default="data/cards")
     parser.add_argument("--only-boundary", action="store_true")
     args = parser.parse_args()
 

@@ -691,6 +691,19 @@ ACTION_INTENT = {
 
 按第 4–8 章流程产出卡片，与业务是什么无关。
 
+卡片放 `data/cards/` 下，**一个业务一个目录**：
+
+```
+data/cards/
+├── order/     # 订单域
+├── sdt/       # 顺店通通用
+├── hr/        # 人力资源
+└── finance/   # 👈 新业务只需新建一个目录
+```
+
+不按卡型再分子目录——卡型已体现在 `card_id` 里（如 `order-task-create`），
+再分一层只是重复。文件名直接用 `card_id`，便于查找。
+
 **第 2 步：声明业务域**
 
 在 `config/retrieval.yaml` 的 `domains` 下追加：

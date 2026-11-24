@@ -5,7 +5,7 @@
 
 用法:
     uv run scripts/validate_cards.py --dir data/cards
-    uv run scripts/validate_cards.py --dir data/cards/_demo --verbose
+    uv run scripts/validate_cards.py --dir data/cards --verbose
 
 依赖:
     - PyYAML
