@@ -1,0 +1,40 @@
+card_id: order-task-config-options
+type: task
+title: 下单选项在哪配置？成本类型、付款方式怎么加？
+one_liner: 业务配置 → 下单选项，先选组织，再添加下单规则，展开规则后在对应 tab 里加选项。
+body: |
+  【入口】业务配置 → 下单选项
+
+  【配置步骤】
+  1. 页面顶部先**选择组织**（只能选二级组织，不选的话表格是空的）
+  2. 点「添加下单规则」，填规则名称、选使用场景
+     使用场景有：快递下单、订单生成运单、同城急送下单、扫码下单
+  3. 点规则行左侧箭头**【展开】**，下面有多个 tab：
+     成本类型、付款方式、取件时间、品类、增值服务等
+  4. 在对应 tab 里逐项添加「项目名」「项目值」
+  5. 成本类型还支持加「别名」和「自定义说明」（限 30 字/条），
+     说明会显示在下单页和批量导入模板上
+
+  【使用范围怎么算】
+  组织没配规则时，**自动用上级组织的规则**，逐级往上找，最后落到系统默认规则。
+  所以配给上级组织，下级会继承。
+
+  【系统默认规则】由系统生成，不可删除。
+
+  【谁能配】需要业务配置的管理权限（仅一级组织管理员或授权角色）。
+
+  【重要】每个组织配的内容都不一样。
+  你们组织实际有哪些成本类型、付款方式，**以下单页实际显示为准，我不能替你查**。
+anchors: [下单选项, 配置成本类型, 添加成本类型, 配置下单规则, 付款方式配置, 取件时间配置, 下单选项配置, 业务配置]
+module: 订单
+entry_path: 业务配置 → 下单选项
+roles: [一级组织管理员, 系统管理员]
+permissions: []
+source_ref:
+  - eps-store-core-fenew/src/pages/service/orderItems/index.vue
+  - eps-store-core-fenew/src/pages/service/orderItems/components/ordinaryType.vue
+  - united-store-be/knowledge/database/tables.md#us_order_conf
+owner: "01415465"
+verified_at: 2026-11-24
+expires_at: 2027-05-24
+related: [order-glossary-order-fields, order-trouble-missing-cost-type]

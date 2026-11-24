@@ -1,0 +1,37 @@
+card_id: order-task-create
+type: task
+title: 怎么下单？订单怎么创建？
+one_liner: 进「订单管理 → 新建订单」，选下单类型、填收寄件人和货物信息，最后点「下单」提交。
+body: |
+  【入口】左侧菜单「订单管理」→「新建订单」
+  也可在小程序下单，本文讲 PC 端。
+
+  【步骤】
+  1. 先选「物流公司」「下单类型」—— 这两项决定后面显示哪些字段
+     下单类型常见的有：标准下单、调拨下单、退货、异地代发
+  2. 寄件方和收件方都要填：区域、姓名、电话、公司名称、地址
+  3. 填货物信息：名称、数量、重量
+  4. 按需填预约取件时间、付款方式、月结卡号
+  5. 点页面底部「下单」提交
+
+  【会被拦下的情况】
+  · 取件时间必须晚于当前时间 **2 小时以上**，否则创建失败
+  · 同一客户订单号已存在且状态不是「导入」的，直接拒单
+  · 货物数量不填或填 0，系统会**按 1 件**处理
+  · 跨境单的货物数量必须等于报关明细项数量之和
+
+  【下单后不是立即生效】
+  如果命中了审批规则，订单会进入「待审批」，需要审批人通过后才会真正下到顺丰。
+  见「订单审批流程」卡。
+anchors: [下单, 创建订单, 新建订单, 下订单, 录入订单, 订单创建, 标准下单, 调拨下单, 异地代发, /sdtOrder/addOrder]
+module: 订单
+entry_path: 订单管理 → 新建订单
+roles: [订单操作员, 客服]
+permissions: []
+source_ref:
+  - knowledge/rules/business-rules.md#1.1
+  - eps-store-core-fenew/src/pages/sdtOrder/addOrder/addorder.vue
+owner: "01415465"
+verified_at: 2026-11-24
+expires_at: 2027-05-24
+related: [order-task-config-options, order-glossary-order-fields]

@@ -1,0 +1,21 @@
+card_id: hr-glossary-assessment-status
+type: glossary
+title: 第三方测评的几个状态分别是什么意思？
+one_liner: 草稿和未发布都能改、能发；已发布生效但锁死；已结束只能看和复制。
+body: |
+  【草稿】只填了测评类型和名称就能存。可继续编辑、删除、发布。
+  【未发布】完整信息已保存但还没发给员工。可继续编辑、删除、发布。
+  【已发布】活动生效，员工收到通知并开始作答。不能编辑、不能删除，只能看详情和复制。
+  【已结束】过了截止日期自动变为此状态，或手动提前结束。不能再作答，不能编辑、删除、重新开启。
+
+  【怎么判断当前状态】列表页「测评状态」列直接显示。
+  【筛选】列表页「测评状态」下拉可选：草稿 / 未发布 / 已发布 / 已结束。
+anchors: [测评状态, 草稿, 未发布, 已发布, 已结束, 状态含义]
+module: 人力资源
+entry_path: https://talent.sf-express.com/static-portal/#/
+roles: [人力资源专员, 测评管理员]
+permissions: []
+source_ref: ["顺店通-面客资料库/HRMI/测评中台-第三方测评操作指引.md#状态与可用操作"]
+owner: "01415465"
+verified_at: 2026-11-24
+related: [hr-rule-assessment-publish]

@@ -1,0 +1,35 @@
+card_id: order-trouble-duplicate
+type: trouble
+title: 提示「订单号已存在」下不了单怎么办？
+one_liner: 同一客户订单号已存在且状态不是「导入」，系统拒绝重复下单。换个新单号或先删原单。
+body: |
+  【现象】下单时提示客户订单号重复，无法创建。
+
+  【规则】同一客户订单号（customerOrderNo）如果已经存在，
+  且那条订单的状态**不是**「导入」状态，就会拒绝创建。
+
+  【为什么会碰到】
+  · 同一批 Excel 重复导入
+  · 客户系统重推了同一单号
+  · 之前下过单但没注意
+
+  【处理办法】
+  1. 先用「客户运单号」在订单列表查一下是否已存在
+  2. 如果原订单是「导入」状态，可以直接继续处理
+  3. 如果需要重新下单，**换一个新的客户订单号**
+  4. 确需覆盖，联系管理员处理原订单
+
+  【特殊情况】原订单已被删除后，同一单号可以重新使用。
+
+  【配置说明】重复单号校验是否启用受服务开通配置控制，
+  不同组织可能策略不同。
+anchors: [订单号已存在, 重复下单, 客户订单号重复, 不能重复提交, 单号重复, 重复单]
+module: 订单
+entry_path: 订单管理 → 新建订单
+roles: [订单操作员, 客服]
+permissions: []
+source_ref: ["knowledge/rules/business-rules.md#1.1", "knowledge/rules/business-rules.md#1.9"]
+owner: "01415465"
+verified_at: 2026-11-24
+expires_at: 2027-05-24
+related: [order-task-create, order-rule-create-limits]

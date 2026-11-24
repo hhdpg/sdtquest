@@ -1,0 +1,37 @@
+card_id: order-trouble-no-permission
+type: trouble
+title: 为什么订单按钮点不了、看不到数据？
+one_liner: 多半是权限或组织不匹配：删除要求一级组织一致，查询要能看到该组织数据。
+body: |
+  【按场景排查】
+
+  ① 删除按钮不生效
+  · 订单状态是不是已经取件了？只有未取件能删
+  · 订单来源是不是不在允许列表里？
+    只有批量导入、单独下单、开放服务器、合单管理、
+    第三方月结批量订单这几种能删
+  · **你的一级组织和订单所属组织是否一致？**不一致删不了
+
+  ② 查不到订单数据
+  · 时间跨度是否超过 31 天
+  · 查询日期是否早于系统起始日期
+  · 结果是否超过 15000 条被截断
+  · 是否没有该组织的数据权限
+
+  ③ 看不到某个菜单或按钮
+  · 角色权限没配。找管理员在「系统管理 → 角色管理 → 配置权限」
+    给你的角色勾上对应权限
+
+  【最快的确认方式】
+  把报错截图 + 你在哪个页面点的哪个按钮，发到群里问，
+  比猜测快得多。
+anchors: [按钮点不了, 看不到订单, 没有权限, 权限不足, 删不了订单, 看不到数据, 操作无响应]
+module: 订单
+entry_path: 订单管理 → 订单列表
+roles: [订单操作员, 客服]
+permissions: []
+source_ref: ["knowledge/rules/business-rules.md#1.3", "knowledge/rules/business-rules.md#1.5"]
+owner: "01415465"
+verified_at: 2026-11-24
+expires_at: 2027-05-24
+related: [order-rule-cancel-delete, order-rule-query-limits, sdt-trouble-no-order-permission]

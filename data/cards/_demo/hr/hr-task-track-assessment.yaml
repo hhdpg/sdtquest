@@ -1,0 +1,32 @@
+card_id: hr-task-track-assessment
+type: task
+title: 怎么查看测评进度、催办未作答的人？
+one_liner: 列表页直接看「发送数量」和「回收数量」两列；要催办就进详情筛「未作答」导出名单。
+body: |
+  【列表页快速判断】
+  进入「第三方测评」列表，看两列：
+  · 回收数量接近发送数量 → 进度良好
+  · 两者差距大 → 需要催办
+
+  【催办步骤】
+  1. 点测评名称进详情页
+  2. 参与人员列表按作答状态筛「未作答」
+  3. 点「导出」导出未完成名单（Excel）
+  4. 把名单发给对应 HR，或通过邮件/消息通知员工
+
+  【统计口径】
+  · 发送总数 = 已发送问卷的人数
+  · 回收总数 = 已提交问卷的人数
+  · 回收率 = 回收总数 / 发送总数
+
+  【建议节奏】截止前 1 天导出未完成名单集中催办
+anchors: [测评进度, 回收率, 催办, 未作答, 发送数量, 回收数量, 导出名单, 跟踪进度]
+module: 人力资源
+entry_path: https://talent.sf-express.com/static-portal/#/
+roles: [人力资源专员, 测评管理员]
+permissions: []
+source_ref: ["顺店通-面客资料库/HRMI/测评中台-第三方测评操作指引.md#查看详情与跟踪进度"]
+owner: "01415465"
+verified_at: 2026-11-24
+expires_at: 2027-05-24
+related: [hr-task-create-assessment, hr-glossary-assessment-status]

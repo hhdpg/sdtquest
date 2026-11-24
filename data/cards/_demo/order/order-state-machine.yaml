@@ -1,0 +1,44 @@
+card_id: order-state-machine
+type: glossary
+title: 订单都有哪些状态？分别是什么意思？
+one_liner: 导入→已下单→已取件→运输中→派送中→已完成；中间可能进待审批、异常或取消。
+body: |
+  【按业务流程顺序】
+
+  · **导入**（IMPORT）
+  订单已创建，但还没提交给顺丰。这个状态可以继续处理或删除。
+
+  · **已下单**（ALREADY_CREATE_ORDER）
+  顺丰侧已创建，运单号已分配。
+
+  · **已取件**（ALREADY_PICK_PARK）
+  快递员已取件。**过了这个状态，部分操作就不能做了**
+  （比如不能申请子运单号、不能删除）。
+
+  · **运输中**（TRANSPORTING）
+  在途运输。
+
+  · **派送中**（DISPATCH）
+  正在派送。
+
+  · **已完成**（FINISH）
+  派送成功。
+
+  【其他分支状态】
+  · **待审批**（UNREVIEW）——命中审批规则，等人审
+  · **审批通过**（REVIEW_PASS）——继续向下游下单
+  · **已驳回**（REJECT）——审批未通过，订单终止
+  · **异常**（EXCEPTIONAL / ABNORMAL）——需要人工处理
+  · **已取消**（CANCEL）——软删除
+
+  【查状态】订单列表的「订单状态」列直接显示。
+anchors: [订单状态, 状态含义, 导入状态, 已下单, 已取件, 运输中, 派送中, 已完成, 待审批, 异常件]
+module: 订单
+entry_path: 订单管理 → 订单列表
+roles: [订单操作员, 客服]
+permissions: []
+source_ref: ["knowledge/rules/business-rules.md#1.11", "knowledge/rules/business-rules.md#1.13"]
+owner: "01415465"
+verified_at: 2026-11-24
+expires_at: 2027-05-24
+related: [order-rule-cancel-delete, order-flow-approval]

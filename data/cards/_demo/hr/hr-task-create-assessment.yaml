@@ -1,0 +1,31 @@
+card_id: hr-task-create-assessment
+type: task
+title: 怎么发起第三方测评？
+one_liner: 进「第三方测评」页点「新增」，选类型填信息导入名单，核对后点「发布」即可。
+body: |
+  【入口】丰声Next → 工作 → HR工作台 → 人才管理集成平台（HRMI）→ 人才测评系统 → 测评管理 → 第三方测评
+
+  【步骤】
+  1. 点「新增」，在「测评类型」下拉选本次使用的供应商类型
+  2. 填测评名称、截止日期、测评场景、测评人群
+  3. 选参与人员（名单导入 或 条件设置，二选一）
+  4. 点「点击下载」导出名单核对，确认无漏人重人
+  5. 点「发布」
+
+  【关键提醒】
+  · 发布没有二次确认，点下去立即生效
+  · 发布后不能编辑也不能删除，只能查看详情或复制
+  · 参与人数超过 300 人要拆成多个活动
+  · 测评名称建议「组织/人群+内容+年月」，不超过 100 字
+
+  【常见卡点】选不到测评类型 → 没有该类型数据权限，点下拉旁"点击此处申请"
+anchors: [第三方测评, 发起测评, 新增测评, 创建测评, 测评发布, HRMI, 人才测评系统]
+module: 人力资源
+entry_path: https://talent.sf-express.com/static-portal/#/
+roles: [人力资源专员, 测评管理员]
+permissions: []
+source_ref: ["顺店通-面客资料库/HRMI/测评中台-第三方测评操作指引.md#新增第三方测评"]
+owner: "01415465"
+verified_at: 2026-11-24
+expires_at: 2027-05-24
+related: [hr-rule-assessment-publish, hr-task-import-participants]

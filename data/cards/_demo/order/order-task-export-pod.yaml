@@ -1,0 +1,37 @@
+card_id: order-task-export-pod
+type: task
+title: 怎么批量导出 POD？在哪里导？
+one_liner: 在阿迪订单页勾选订单，点「批量导出POD」，单次最多 20 单，导出的是 zip 压缩包。
+body: |
+  【入口】
+  阿迪运单管理 → IB 订单列表页，顶部筛选区右侧有「批量导出POD」按钮。
+
+  【步骤】
+  1. 先按条件查询，缩小到要导的订单范围
+  2. 在列表左侧**勾选**要导的订单（必须至少选一条）
+  3. 点「批量导出POD」
+  4. 系统生成 zip 包后自动下载，文件名是「批量导出POD.zip」
+
+  【限制】
+  · 单次**最多 20 单**，超了会提示「单次批量导出上限20单」
+  · 一条都没勾选会提示「请至少选择一条数据」
+
+  【导出的是什么】
+  是 POD 图片，打包成 zip，不是 Excel 表格。
+  如果你要的是订单数据表格，用列表页的普通「导出」按钮。
+
+  【需要权限】
+  这个按钮受接口权限控制，没权限的话按钮不显示。
+  找不到按钮就先确认权限。
+
+  【POD 是什么】签收单，收货方确认收货的凭证。详见「POD 是什么」卡。
+anchors: [批量导出POD, 导出POD, POD导出, 签收单导出, 导出签收图片, 批量导出签收单, 导出POD图片]
+module: 订单
+entry_path: 阿迪运单管理 → IB订单 → 批量导出POD
+roles: [阿迪业务操作员, 客服]
+permissions: []
+source_ref: ["eps-store-core-fenew/src/pages/adiBus/ibOrder/index.vue"]
+owner: "01415465"
+verified_at: 2026-11-24
+expires_at: 2027-05-24
+related: [order-glossary-pod, order-trouble-export-limit]

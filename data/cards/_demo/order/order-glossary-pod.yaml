@@ -1,0 +1,36 @@
+card_id: order-glossary-pod
+type: glossary
+title: POD 是什么？在哪看签收单？
+one_liner: POD 就是签收单，是收货方确认收到货的凭证，在运单详情里看。
+body: |
+  【定义】
+  POD 是 Proof of Delivery 的缩写，中文叫「签收单」或「签回单」，
+  是收货方确认收到货物的凭证。
+
+  【在系统哪里看】
+  订单管理 → 找到运单 → 点进详情 → 签收相关页签。
+
+  【常见用途】
+  · 客户要签收证明 → 提供 POD
+  · 理赔举证 → 调取 POD
+  · 对账核实 → 核对签收时间
+
+  【电子签回和纸质签回的区别】
+  · **电子签回**：存的是数量，默认 1
+  · **纸质签回**：存的是所选的跟踪项类型
+  · 两个都有时：同时存数量和跟踪项的 JSON
+
+  【相关概念】
+  · 签收 = 客户收到货
+  · 签回单 = 客户签字确认的那张单
+  · 与「代收货款」不同，代收是代收金额，不是签收凭证
+anchors: [POD, 签收单, 签回单, 签回, 电子签回, 纸质签回, 签收凭证, 回单]
+module: 订单
+entry_path: 订单管理 → 运单详情
+roles: [订单操作员, 客服]
+permissions: []
+source_ref: ["knowledge/rules/business-rules.md#1.10"]
+owner: "01415465"
+verified_at: 2026-11-24
+expires_at: 2027-05-24
+related: [order-glossary-waybill]
