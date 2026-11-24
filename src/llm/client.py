@@ -16,6 +16,7 @@ from loguru import logger
 from src.config import settings
 from src.domain.exceptions import LLMServiceError
 from src.domain.ports import GenerateOptions
+from src.shared.http import create_direct_client
 
 
 class OllamaClient:
@@ -110,7 +111,7 @@ class OllamaClient:
                 if self.think is not None:
                     payload["think"] = self.think
 
-                async with httpx.AsyncClient(timeout=self.timeout) as client:
+                async with create_direct_client(timeout=self.timeout) as client:
                     response = await client.post(
                         f"{self.base_url}/api/generate",
                         json=payload,
@@ -195,7 +196,7 @@ class OllamaClient:
                     },
                 }
 
-                async with httpx.AsyncClient(timeout=self.timeout) as client:
+                async with create_direct_client(timeout=self.timeout) as client:
                     async with client.stream(
                         "POST",
                         f"{self.base_url}/api/generate",
@@ -245,7 +246,7 @@ class OllamaClient:
                     "input": texts,
                 }
 
-                async with httpx.AsyncClient(timeout=self.timeout) as client:
+                async with create_direct_client(timeout=self.timeout) as client:
                     response = await client.post(
                         f"{self.base_url}/api/embed",
                         json=payload,
@@ -284,7 +285,7 @@ class OllamaClient:
             True 表示服务可用，False 表示不可用
         """
         try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
+            async with create_direct_client(timeout=5.0) as client:
                 response = await client.get(f"{self.base_url}/api/tags")
                 return response.status_code == 200
         except Exception:
@@ -298,7 +299,7 @@ class OllamaClient:
             模型名称列表
         """
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with create_direct_client(timeout=10.0) as client:
                 response = await client.get(f"{self.base_url}/api/tags")
                 response.raise_for_status()
                 result = response.json()

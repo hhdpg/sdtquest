@@ -14,6 +14,7 @@
 """
 
 import asyncio
+import os
 from typing import Any
 
 from loguru import logger
@@ -160,7 +161,32 @@ class BotRouter:
 
         使用指数退避策略: 延迟 = base_delay * 2^reconnect_count，
         最大不超过 300 秒（5 分钟）。
+
+        注意: dingtalk-stream SDK 内部用 requests/websockets，会读取
+        HTTP_PROXY/HTTPS_PROXY 环境变量。桌面端注入的代理端口在重启后会变化，
+        导致旧进程连死端口而静默失联。这里在连接期间临时清除代理变量，
+        强制 SDK 直连钉钉（国内服务，无需代理）。
         """
+        # 临时清除代理环境变量（仅影响本进程内 SDK 的 requests 调用）
+        proxy_vars = (
+            "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY",
+            "http_proxy", "https_proxy", "all_proxy",
+        )
+        saved_proxies = {k: os.environ.pop(k, None) for k in proxy_vars}
+        removed = [k for k, v in saved_proxies.items() if v]
+        if removed:
+            logger.info("Stream 连接期间禁用代理 | vars={}", removed)
+
+        try:
+            await self._reconnect_loop()
+        finally:
+            # 恢复原有环境变量，避免影响其他组件
+            for k, v in saved_proxies.items():
+                if v is not None:
+                    os.environ[k] = v
+
+    async def _reconnect_loop(self) -> None:
+        """实际的 Stream 重连循环"""
         while self._running:
             try:
                 logger.info(

@@ -99,9 +99,9 @@ def _check_chromadb() -> dict[str, str]:
 async def _check_ollama() -> dict[str, str]:
     """检查 Ollama 服务状态"""
     try:
-        import httpx
+        from src.shared.http import create_direct_client
 
-        async with httpx.AsyncClient(timeout=5.0) as client:
+        async with create_direct_client(timeout=5.0) as client:
             response = await client.get(f"{settings.OLLAMA_BASE_URL}/api/tags")
             if response.status_code == 200:
                 return {"status": "ok", "url": settings.OLLAMA_BASE_URL}

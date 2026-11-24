@@ -11,6 +11,7 @@ from loguru import logger
 
 from src.config import settings
 from src.domain.exceptions import DingTalkAPIError
+from src.shared.http import create_direct_client
 
 
 class DingTalkClient:
@@ -69,7 +70,7 @@ class DingTalkClient:
             return self._access_token
 
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with create_direct_client(timeout=10.0) as client:
                 response = await client.post(
                     f"{self.NEW_API_BASE_URL}/v1.0/oauth2/accessToken",
                     json={
@@ -230,7 +231,7 @@ class DingTalkClient:
         }
 
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            async with create_direct_client(timeout=30.0) as client:
                 response = await client.post(
                     webhook_url,
                     headers={"Content-Type": "application/json"},
@@ -297,7 +298,7 @@ class DingTalkClient:
             body["atUserIds"] = at_user_ids
 
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            async with create_direct_client(timeout=30.0) as client:
                 response = await client.post(
                     f"{self.NEW_API_BASE_URL}/v1.0/robot/groupMessages/send",
                     headers={
@@ -369,7 +370,7 @@ class DingTalkClient:
         token = await self.get_access_token()
 
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with create_direct_client(timeout=10.0) as client:
                 response = await client.post(
                     f"{self.NEW_API_BASE_URL}/v1.0/robot/groupMessages/recall",
                     headers={
