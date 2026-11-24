@@ -46,6 +46,11 @@ data/cache/
 data/knowledge/
 data/logs/
 
+# 手册转换产物：原文截图体积大，不入库；
+# 正文 Markdown 可入库（体积小、可 review）
+data/manuals/_raw/
+data/manuals/*.media/
+
 # 测试
 .pytest_cache/
 .coverage
