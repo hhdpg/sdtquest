@@ -85,6 +85,9 @@ generic_tokens:
   - 活动
   - 服务器
   - 服务
+  - 员工
+  - 流程
+  - 申请
 
 # ── 规则2：排障意图标记 ───────────────────────────────
 # 问题中出现这些词，说明用户在问"为什么不行"
@@ -123,7 +126,7 @@ troubleshoot_markers:
 # 通用意图跨业务复用；业务专属意图在各业务的 intents 下追加
 intents:
   开通:
-    markers: [开通, 申请]
+    markers: [开通]
     card_types: [flow]
   配置:
     # "在哪配置"既可能是 rule（规则怎么定）也可能是 task（动手操作）
@@ -137,7 +140,7 @@ intents:
     card_types: [glossary]
   限制:
     markers: [限制, 最多, 几个, 上限, 数量, 可以吗, 能吗]
-    card_types: [rule, glossary]
+    card_types: [rule, glossary, task]
   审批:
     markers: [审批, 审核, 驳回]
     card_types: [rule, flow]
@@ -176,7 +179,7 @@ domains:
   报表:
     keywords: [报表, 统计, 数据看板, 字段, 导出Excel]
   库存:
-    keywords: [库存, 仓库, 盘点, 缺货, 要货]
+    keywords: [库存, 仓库, 盘点, 缺货, 要货, WMS, 库存查询]
   测评:
     keywords: [测评, 问卷, 作答, 回收, 催办]
   同城:
@@ -204,6 +207,11 @@ domains:
     keywords: [商户, 开通商户, 数字商店, 运营平台, 来源单号, 订阅]
   版本:
     keywords: [版本, 套餐, 标准版, 专业版, 高级版, 旗舰版, 定价]
+  # 👇 2026-11-24 供应链补卡新增
+  供应链:
+    keywords: [收单, 要货, 补货, 店铺, 电子面单, 商品, 地址簿, 到齐派, 需求单]
+  预算:
+    keywords: [预算, 运费预算, 额度, 超预算, 预算上限]
 
 # ── 规则9：反向动作对 ─────────────────────────────────
 # 问"导出"时不应命中讲"导入"的卡

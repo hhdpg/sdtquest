@@ -1,0 +1,42 @@
+card_id: sdt-flow-requirement-plan
+type: flow
+title: 需求管理（到齐派）怎么用？需求单怎么变成发货单和运单？
+one_liner: 建需求单（到货日期必须一致且晚于今天）→ 发运处理按提货信息分组 → 分配箱号 → 生成运单。
+body: |
+  【它是干什么的】
+  多个物品要**凑齐后一起发**（到齐派送）的场景：
+  先提需求，系统按「提货公司 + 联系人 + 电话 + 提货地址」分组，
+  凑齐后统一发运。
+
+  【新建需求】
+  · 所有物品的**要求到货日期必须一致**，否则不能提交
+  · 要求到货日期**必须晚于当前日期**
+  · 建好后状态为「待处理」
+
+  【发运处理】
+  1. 给物品分配箱号（箱号不能重复、此箱号已下单的不能再分配）
+  2. 生成运单（呼叫快递）
+  3. 已呼叫快递的物品不能再呼叫，避免重复下单
+  4. 需要修改可取消后重来
+
+  【到齐派的特殊规则】
+  · 同批次到齐派送的运单，要求到货日期必须完全一致或全为空
+  · 到齐派送场景**不支持「下 call」**（上门取件），
+    也不支持定时派送
+  这是到齐派本身的限制，不是系统故障。
+
+  【说明】需求单分组依据、箱号规则以上述代码为准；
+  具体业务当然可以按客户约定调整，以实际配置为准。
+anchors: [需求管理, 到齐派, 需求单, 发运处理, 到货日期, 箱号分配, 凑齐发运]
+module: 顺店通-供应链
+entry_path: 需求管理 → 需求管理 / 发运处理
+roles: [运营, 仓管]
+permissions: [需求管理]
+source_ref:
+  - eps-store-core-united-store-be/RequirementPlanServiceImpl.java#L300
+  - eps-store-core-united-store-be/UniversalCreateOrderReq.java#L213
+  - 顺店通-面客资料库/顺店通操作手册-1202（含供应链服务）.docx#4 需求管理
+owner: "01415465"
+verified_at: 2026-11-24
+expires_at: 2027-05-24
+related: [order-task-create, sdt-flow-requisition, order-task-batch-import]

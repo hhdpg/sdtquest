@@ -36,7 +36,8 @@ DEFAULT_CONFIG_PATH = Path("config/retrieval.yaml")
 
 # 疑问/虚词片段：n-gram 产生的跨词边界碎片特征。
 # 含这些字的短 token 基本不可能是有意义的业务词。
-FRAGMENT_CHARS = ("么", "样", "哪")
+# "怎"：如"报销单怎么填"里的"单怎"，跨词边界无意义，且会误命中任何含"单"的卡。
+FRAGMENT_CHARS = ("么", "样", "哪", "怎")
 
 
 @dataclass(frozen=True)

@@ -36,4 +36,4 @@ source_ref: ["顺店通-面客资料库/工单模块操作手册（新）_202501
 owner: "01415465"
 verified_at: 2026-11-24
 expires_at: 2027-05-24
-related: [sdt-task-monitoring-rule, sdt-trouble-ticket-not-found]
+related: [sdt-task-monitoring-rule, sdt-trouble-ticket-not-found, sdt-glossary-ticket-types]

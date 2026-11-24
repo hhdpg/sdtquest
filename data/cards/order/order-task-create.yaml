@@ -35,4 +35,4 @@ source_ref:
 owner: "01415465"
 verified_at: 2026-11-24
 expires_at: 2027-05-24
-related: [order-task-config-options, order-glossary-order-fields, order-task-query-waybill, sdt-task-scenario-code, order-trouble-no-permission, order-trouble-pick-time, sdt-trouble-no-phone]
+related: [order-task-config-options, order-glossary-order-fields, order-task-query-waybill, sdt-task-scenario-code, order-trouble-no-permission, order-trouble-pick-time, sdt-trouble-no-phone, order-task-batch-import, order-glossary-order-types]

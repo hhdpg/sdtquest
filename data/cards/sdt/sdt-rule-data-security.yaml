@@ -39,4 +39,4 @@ source_ref:
 owner: "01415465"
 verified_at: 2026-11-24
 expires_at: 2027-05-24
-related: [sdt-task-print-settings, sdt-rule-role-permission, sdt-trouble-miniapp-no-access]
+related: [sdt-task-print-settings, sdt-rule-role-permission, sdt-trouble-miniapp-no-access, sdt-task-address-book]

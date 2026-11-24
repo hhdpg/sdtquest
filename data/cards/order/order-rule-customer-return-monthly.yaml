@@ -1,0 +1,43 @@
+card_id: order-rule-customer-return-monthly
+type: rule
+title: 客户退货能用寄付月结吗？为什么提示不能使用？
+one_liner: 不能。客户退货（退货类成本类型）禁用寄付月结，要换成到付、现结或其他付款方式。
+body: |
+  【规则本体】
+  **客户退货场景不能使用寄付月结服务。**
+  也就是：下单类型是「客户退货」、成本类型是退货类时，
+  付款方式不能选「寄付月结/月结卡号」。
+
+  【会触发的情况】
+  · 客户退货 + 付款方式选寄付月结 → 直接拦截
+  · 批量导入里出现这种组合 → 该行报错，整行失败
+
+  【为什么这么设计】
+  退货件本身是往回寄，费用不该记在寄方月结上，
+  避免退货单滥用客户月结。
+
+  【怎么处理】
+  改成以下任一种付款方式：
+  · 到付（收件方付）
+  · 寄付现结
+  · 其他非寄付月结的方式
+
+  【和「缺少成本类型」区分】
+  · 缺少成本类型：是退货类成本类型没配 → 去下单选项补配
+  · 本卡：是配了退货成本类型、但付款方式用了寄付月结 → 换付款方式
+  两者常一起出现，先看是「没配」还是「配了但付款方式不对」。
+
+  【说明】具体哪些付款方式可选，以下单页实际显示为准，我不能替你查。
+anchors: [客户退货寄付月结, 退货不能用月结, 客户退货不可使用寄付月结服务, 退货付款方式, 退货成本类型]
+module: 订单
+entry_path: 订单管理 → 新建订单（客户退货）
+roles: [订单操作员, 客服]
+permissions: []
+source_ref:
+  - eps-store-core-united-store-be/OrderUtils.java#L83
+  - eps-store-core-united-store-be/CommonCustomNumberRuleServiceImpl.java#L417
+  - 顺店通-面客资料库/顺店通操作手册-1202（含供应链服务）.docx#14 名词说明
+owner: "01415465"
+verified_at: 2026-11-24
+expires_at: 2027-05-24
+related: [order-glossary-order-fields, order-trouble-missing-cost-type, sdt-glossary-monthly-billing-modes]

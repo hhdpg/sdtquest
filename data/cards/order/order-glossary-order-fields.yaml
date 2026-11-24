@@ -39,4 +39,4 @@ source_ref:
 owner: "01415465"
 verified_at: 2026-11-24
 expires_at: 2027-05-24
-related: [order-task-config-options, order-task-create, order-glossary-value-added]
+related: [order-task-config-options, order-task-create, order-glossary-value-added, order-glossary-order-types]
