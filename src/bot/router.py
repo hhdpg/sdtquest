@@ -294,11 +294,28 @@ class BotRouter:
             return self._empty_message()
 
         # 提取文本内容
+        # 钉钉在 @机器人 时可能发送 richText（富文本）而非 text，此时
+        # chat.text 为空，文本分散在 rich_text_content.rich_text_list 中。
+        # SDK 的 get_text_list() 已统一处理两种类型。
         text_content = ""
-        if getattr(chat, "text", None) is not None:
-            text_obj = chat.text
-            text_content = (
-                text_obj.content if hasattr(text_obj, "content") else str(text_obj)
+        try:
+            text_parts = chat.get_text_list() or []
+            text_content = " ".join(p for p in text_parts if p)
+        except Exception as e:
+            logger.warning("get_text_list 失败，回退到 text 字段 | error={}", str(e))
+            text_obj = getattr(chat, "text", None)
+            if text_obj is not None:
+                text_content = (
+                    text_obj.content if hasattr(text_obj, "content") else str(text_obj)
+                )
+
+        # 文本为空时记录消息类型，便于排查非文本消息（图片/富文本等）
+        if not text_content:
+            logger.warning(
+                "消息文本为空 | msgtype={} | 有rich_text={} | 有image={}",
+                getattr(chat, "message_type", "?"),
+                bool(getattr(chat, "rich_text_content", None)),
+                bool(getattr(chat, "image_content", None)),
             )
 
         message_data = {

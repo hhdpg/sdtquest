@@ -92,6 +92,7 @@ class TestBotRouter:
         callback.sender_nick = "测试用户"
         callback.text = MagicMock()
         callback.text.content = "@机器人 如何创建订单?"
+        callback.get_text_list = MagicMock(return_value=["@机器人 如何创建订单?"])
         callback.message_id = "msg_789"
         callback.conversation_type = "2"
         callback.chatbot_user_id = "bot_001"
@@ -114,6 +115,7 @@ class TestBotRouter:
         callback.sender_id = "user_456"
         callback.sender_nick = "用户"
         callback.text = None
+        callback.get_text_list = MagicMock(return_value=[])
         callback.message_id = "msg_789"
         callback.conversation_type = "2"
 
@@ -270,3 +272,64 @@ class TestBotRouter:
         """测试设置 _running 后 is_running 变化"""
         router._running = True
         assert router.is_running is True
+
+    def test_parse_richtext_message(self, router: BotRouter) -> None:
+        """必须能解析 richText（富文本）消息
+
+        回归保护: 钉钉在 @机器人 时常发送 msgtype=richText 而非 text，
+        此时 chat.text 为空，文本分散在 rich_text_content.rich_text_list。
+        旧实现只取 chat.text，导致收到消息但 text=''，handler 直接返回不回复。
+        """
+        import json
+
+        from dingtalk_stream import CallbackMessage
+
+        raw = {
+            "specVersion": "1.0",
+            "type": "CALLBACK",
+            "headers": {
+                "topic": "/v1.0/im/bot/messages/get",
+                "contentType": "application/json",
+                "messageId": "m_rich",
+            },
+            "data": json.dumps({
+                "conversationId": "cid_rich",
+                "senderId": "$:LWCP_v1:$abc",
+                "senderStaffId": "01415465",
+                "senderNick": "谢川东",
+                "msgId": "msg_rich",
+                "conversationType": "2",
+                "isInAtList": True,
+                "sessionWebhook": "https://x/sendBySession?s=1",
+                "msgtype": "richText",
+                "content": {"richText": [
+                    {"text": "@机器人 "},
+                    {"text": "怎么下单"},
+                ]},
+            }),
+        }
+        callback = CallbackMessage.from_dict(raw)
+
+        parsed = router._parse_callback(callback)
+
+        assert parsed["text"].strip() == "@机器人  怎么下单"
+        assert "怎么下单" in parsed["text"]
+        assert parsed["sender_staff_id"] == "01415465"
+        assert parsed["is_in_at_list"] is True
+
+    def test_richtext_text_stripped_to_question(self, router: BotRouter) -> None:
+        """富文本解析出的文本应能被提取为有效问题
+
+        端到端保证: richText → 文本 → 问题提取，不出现"收到消息但不回复"。
+        """
+        from unittest.mock import MagicMock
+
+        from src.bot.handler import BotHandler
+
+        handler = BotHandler(
+            qa_service=MagicMock(), sender=MagicMock(), session_manager=MagicMock()
+        )
+
+        question = handler._extract_question("@机器人  怎么下单")
+
+        assert question == "怎么下单"
