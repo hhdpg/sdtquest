@@ -35,6 +35,10 @@ class KnowledgeItem(BaseModel):
     page_path: str | None = None
     source_file: str | None = None
     tags: list[str] = Field(default_factory=list)
+    # 卡片 schema 专有字段：一句话答案与业务模块。
+    # 检索重排需要原始 one_liner（不能用 content 首句还原，句号会被吞掉）。
+    one_liner: str | None = None
+    module: str | None = None
     embedding: list[float] | None = None
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)

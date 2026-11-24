@@ -114,7 +114,17 @@ class HybridRetriever:
                 )
                 return []
 
-            items = [item for item, _ in merged[:top_k]]
+            # 重排需要比最终结果更大的候选池——若先按 top_k 截断，
+            # 正确答案可能已被切掉，重排也救不回来。
+            # 取 top_k*3（向上取整且至少 10 条）作为重排输入。
+            pool_size = max(top_k * 3, 10)
+            candidates = [item for item, _ in merged[:pool_size]]
+
+            # ── 关键词规则重排（九条防误召回规则）──
+            # RRF 只看相对排名，无法处理"泛化词误命中""跨域串味"等问题。
+            # 这里用 card_scoring 对候选池重新打分，再截断到 top_k。
+            items = self._rerank_with_rules(query, candidates, dense_scored, top_k)
+
             logger.info(
                 "混合检索完成 | dense={} | sparse={} | merged={} | final={}",
                 len(dense_results), len(sparse_results),
@@ -126,6 +136,126 @@ class HybridRetriever:
         except Exception as e:
             logger.error("混合检索失败 | error={}", str(e))
             return []
+
+    def _rerank_with_rules(
+        self,
+        query: str,
+        items: list[KnowledgeItem],
+        dense_scored: list[tuple[KnowledgeItem, float]],
+        top_k: int,
+    ) -> list[KnowledgeItem]:
+        """
+        用九条关键词规则对候选集重排。
+
+        只重排已有候选，不改变候选集；若规则打分全部低于阈值，
+        回退到原向量排序，避免规则配置缺失时把结果清空。
+
+        Args:
+            query: 查询文本
+            items: 向量/关键词召回后的候选
+            dense_scored: 带相似度分数的候选（用于回退）
+            top_k: 返回条数
+
+        Returns:
+            重排后的知识条目
+        """
+        try:
+            from src.rag.card_scoring import card_to_dict
+
+            scorer = self._get_scorer()
+            corpus = self._load_corpus()
+
+            # 重排优先用全库原始卡片：向量库往返会丢失 one_liner 等字段，
+            # 导致分数失真。按 card_id 从全库取原始 dict。
+            if corpus:
+                by_cid = {c["card_id"]: c for c in corpus}
+                card_dicts = []
+                item_by_cid = {}
+                for it in items:
+                    cid = it.id
+                    item_by_cid[cid] = it
+                    card_dicts.append(by_cid.get(cid) or card_to_dict(it))
+            else:
+                card_dicts = [card_to_dict(it) for it in items]
+                item_by_cid = {card_to_dict(it)["card_id"]: it for it in items}
+
+            scorer.fit(corpus if corpus else card_dicts)
+
+            ranked = scorer.rank(query, card_dicts, top_k=len(card_dicts))
+            if not ranked:
+                # 规则分全部低于阈值：可能是配置缺失或新业务未接入，
+                # 此时信任向量召回，不做干预。
+                logger.warning(
+                    "规则重排无命中，回退向量排序 | candidates={}",
+                    len(items),
+                )
+                return items[:top_k]
+
+            # 按重排后的 card_id 顺序还原 KnowledgeItem
+            reranked = [item_by_cid[d["card_id"]] for _, d in ranked
+                        if d["card_id"] in item_by_cid]
+
+            # 重排结果之后，补齐规则未覆盖的候选（保持原有相对顺序）
+            seen = {it.id for it in reranked}
+            for it in items:
+                if it.id not in seen:
+                    reranked.append(it)
+
+            logger.debug(
+                "规则重排完成 | before={} | after={}",
+                items[0].title[:20] if items else "",
+                reranked[0].title[:20] if reranked else "",
+            )
+            return reranked[:top_k]
+
+        except Exception as e:
+            # 重排是增强能力，失败不应影响主检索链路
+            logger.warning("规则重排失败，回退向量排序 | error={}", str(e))
+            return items[:top_k]
+
+    def _get_scorer(self):
+        """惰性初始化打分器（配置缺失时抛错会被上层捕获）"""
+        if not hasattr(self, "_scorer") or self._scorer is None:
+            from src.rag.card_scoring import CardScorer
+
+            self._scorer = CardScorer.from_config()
+        return self._scorer
+
+    def _load_corpus(self) -> list[dict]:
+        """
+        加载全库卡片用于 IDF 计算。
+
+        IDF 是全局统计量，必须基于全库而非候选子集，否则排序不稳定。
+        结果缓存在实例上，避免每轮重读。
+
+        Returns:
+            全库卡片 dict 列表；加载失败时返回空列表
+        """
+        if getattr(self, "_corpus", None) is not None:
+            return self._corpus
+
+        from pathlib import Path
+
+        import yaml
+
+        from src.rag.card_scoring import card_to_dict
+
+        self._corpus: list[dict] = []
+        cards_dir = Path("data/cards")
+        if not cards_dir.is_dir():
+            logger.debug("全库目录不存在，IDF 退回候选池 | dir={}", cards_dir)
+            return self._corpus
+
+        for p in cards_dir.rglob("*.yaml"):
+            try:
+                d = yaml.safe_load(p.read_text(encoding="utf-8"))
+            except yaml.YAMLError:
+                continue
+            if isinstance(d, dict) and d.get("card_id"):
+                self._corpus.append(card_to_dict(d))
+
+        logger.debug("全库加载完成 | cards={}", len(self._corpus))
+        return self._corpus
 
     async def _dense_retrieve(
         self,
