@@ -1,12 +1,16 @@
 card_id: order-rule-create-limits
 type: rule
 title: 下单有哪些限制？取件时间、货物数量有什么要求？
-one_liner: 取件时间要晚于当前 2 小时；货物数量不填按 1 件算；跨境单货物数必须等于报关明细数。
+one_liner: 取件时段太近会被拒（约需提前 2 小时）；货物数量不填按 1 件算；跨境单货物数须等于报关明细数。
 body: |
   【取件时间】
-  · 必须晚于当前时间**至少 2 小时**，否则下单失败
+  · 选的小时数**小于「当前小时 + 2」会被拒**，提示
+    「取件时间太近，多给小哥留点时间吧，请重新选择」
+  · 也就是说要预留约 2 小时，当天内太近的时段选不上
   · 可选小时数只有两种范围：0（当前小时内）或 9–69 小时
   · 超出范围的时间会被置空
+  · 如果选了「自行联系取件」，系统会调顺丰取件时间服务
+    拿有效截止时间，取不到也可能失败
 
   【货物数量】
   · 不填或填 0，系统按**1 件**处理
@@ -18,18 +22,17 @@ body: |
   · 跨境单要算声明价值：所有金额>0 的货物，金额×数量后求和
   · 只有当所有货物币种一致时，才设置单一币种
 
-  【自联取件】
-  选择「自行联系取件」时，系统必须调顺丰取件时间服务拿有效截止时间。
-
   【扫码下单】
   扫码场景下成本类型**只能是退货成本类型**，不允许选其他。
-anchors: [下单限制, 取件时间要求, 2小时, 货物数量, 跨境订单, 报关明细, 声明价值, 自联取件, 扫码下单]
+anchors: [下单限制, 取件时间要求, 取件时间太近, 货物数量, 跨境订单, 报关明细, 声明价值, 自联取件, 扫码下单]
 module: 订单
 entry_path: 订单管理 → 新建订单
 roles: [订单操作员, 客服]
 permissions: []
-source_ref: ["knowledge/rules/business-rules.md#1.1"]
+source_ref:
+  - knowledge/rules/business-rules.md#1.1
+  - eps-store-core-united-store-be/UnitedOrderServiceImpl.java#L637
 owner: "01415465"
 verified_at: 2026-11-24
 expires_at: 2027-05-24
-related: [order-task-create, order-trouble-duplicate]
+related: [order-task-create, order-trouble-duplicate, sdt-trouble-order-method-mismatch, sdt-trouble-order-fail-no-reason]

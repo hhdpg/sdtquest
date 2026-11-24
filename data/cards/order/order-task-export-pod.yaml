@@ -34,4 +34,4 @@ source_ref: ["eps-store-core-fenew/src/pages/adiBus/ibOrder/index.vue"]
 owner: "01415465"
 verified_at: 2026-11-24
 expires_at: 2027-05-24
-related: [order-glossary-pod, order-trouble-export-limit]
+related: [order-glossary-pod, order-trouble-export-limit, order-task-query-waybill]

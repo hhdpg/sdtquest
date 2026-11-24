@@ -34,4 +34,4 @@ source_ref: ["knowledge/rules/business-rules.md#1.7"]
 owner: "01415465"
 verified_at: 2026-11-24
 expires_at: 2027-05-24
-related: [order-glossary-pod, order-state-machine]
+related: [order-glossary-pod, order-state-machine, sdt-trouble-duplicate-waybill]

@@ -40,18 +40,11 @@ REAL_QUESTIONS = [
     "运单是什么",
 ]
 
-# 已知缺口：这些问题需要专门的卡，但当前 demo 卡片集未覆盖。
+# 已知缺口：这些问题需要专门的卡，但当前卡片集未覆盖。
 # 评估时允许"误命中"，但应在报告中标为待补卡。
+# 2026-11-24 补卡后：下单/审批/POD/运单等已有卡，仅剩下列真实缺口。
 KNOWN_GAPS = {
-    "怎么下单",
-    "订单怎么创建",
-    "订单审批流程是什么",
-    "怎么批量导出POD",
-    "阿迪订单页面有哪些操作按钮",
-    "怎么查询所有订单",
-    "库存怎么管理",
-    "新增报表里没看到体积",
-    "运单是什么",
+    "阿迪订单页面有哪些操作按钮",   # 阿迪定制页，无通用卡
 }
 
 # 本域问题：每一对都是「问题 → 应该命中的卡片」
@@ -86,6 +79,44 @@ CASES: dict[str, str] = {
     # 订单域
     "成本类型在哪配置": "order-task-config-options",
     "成本类型是什么意思": "order-glossary-order-fields",
+    # 月结
+    "月结卡号怎么验证": "sdt-task-verify-monthly-account",
+    "月结账号未校验怎么办": "sdt-task-verify-monthly-account",
+    "月结号是怎么挂的": "sdt-glossary-monthly-billing-modes",
+    "按组织挂月结还是按成本类型挂": "sdt-glossary-monthly-billing-modes",
+    # 打印与权限
+    "面单打印怎么设置": "sdt-task-print-settings",
+    "支持什么打印机": "sdt-task-print-settings",
+    "数据安全怎么配": "sdt-rule-data-security",
+    "为什么有的脱敏有的没脱敏": "sdt-rule-data-security",
+    "角色权限怎么配": "sdt-rule-role-permission",
+    "员工登录后按钮点不了": "sdt-rule-role-permission",
+    # FAQ 报错
+    "提示系统异常请联系管理员": "sdt-trouble-system-exception",
+    "报请求入参对象转换失败": "sdt-trouble-input-convert-fail",
+    "提示没有当前用户电话号码信息": "sdt-trouble-no-phone",
+    "导入用户报导入excle出错": "sdt-trouble-import-excel-error",
+    "提示下单方式不符合": "sdt-trouble-order-method-mismatch",
+    "下单失败没有具体原因": "sdt-trouble-order-fail-no-reason",
+    "小程序查快递提示用户无权访问": "sdt-trouble-miniapp-no-access",
+    "为什么会出现重复运单号": "sdt-trouble-duplicate-waybill",
+    # 新业务域
+    "怎么给客户开通商户": "sdt-task-open-merchant",
+    "提示来源单号已存在": "sdt-rule-merchant-source-unique",
+    "监控预警规则怎么设": "sdt-task-monitoring-rule",
+    "工单处理流程是怎样的": "sdt-flow-ticket-process",
+    "新建工单提示未查到关联订单": "sdt-trouble-ticket-not-found",
+    "订单对账怎么做": "sdt-task-order-reconcile",
+    "各个版本有什么区别": "sdt-glossary-pricing-edition",
+    "场景码怎么配置": "sdt-task-scenario-code",
+    "企业微信授权怎么配": "sdt-task-wecom-auth",
+    "月结卡号维护是什么": "sdt-glossary-monitoring-monthly-card",
+    # 查询/报表/库存
+    "怎么查询所有运单": "order-task-query-waybill",
+    "运单列表怎么导出": "order-task-query-waybill",
+    "我的报表怎么建": "sdt-task-custom-report",
+    "报表取数字段没有体积": "sdt-task-custom-report",
+    "库存怎么查询": "sdt-task-inventory-query",
 }
 
 

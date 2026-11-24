@@ -1,0 +1,33 @@
+card_id: sdt-trouble-input-convert-fail
+type: trouble
+title: 下单报错「请求入参对象转换失败」怎么办？
+one_liner: 收寄件地址里带了系统不认识的字符。删掉特殊字符、手动重输地址再下单。
+body: |
+  【报错原文】下单时报「请求入参对象转换失败」。
+
+  【原因】收寄件人地址里有**特殊字符**（系统无法识别的符号/不可见字符），
+  导致参数转换失败。
+
+  【怎么处理】
+  1. 把收寄件地址删除后**手动重新输入**一遍
+  2. 确认没有多余的空格、制表符、特殊符号（如 ©、emoji、全角怪异符号）
+  3. 重新提交下单
+
+  【同类：批量导入也报这个】
+  批量导入模板里地址列如果从别处复制粘贴带了隐藏字符，
+  同样会失败。把该列清空重填成纯文本即可。
+
+  【提示】这属于数据格式问题，不是权限或配置问题，
+  不用去动下单选项。
+anchors: [请求入参对象转换失败, 入参转换失败, 参数转换失败, 地址特殊字符, 下单报错, 地址有特殊字符]
+module: 顺店通
+entry_path: 订单管理 → 新建订单
+roles: [订单操作员, 客服]
+permissions: []
+source_ref:
+  - 顺店通-面客资料库/顺店通常见问题集-客服.docx#Q：下单报错请求入参对象转换失败
+  - eps-store-core-united-store-be/BspErrorCodeEnum.java#L37
+owner: "01415465"
+verified_at: 2026-11-24
+expires_at: 2027-05-24
+related: [sdt-trouble-system-exception, order-task-create, sdt-trouble-import-address]

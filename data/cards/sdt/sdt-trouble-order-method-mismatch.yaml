@@ -1,0 +1,35 @@
+card_id: sdt-trouble-order-method-mismatch
+type: trouble
+title: 下单报「下单方式不符合」怎么办？
+one_liner: 这个产品不支持当前的取件/付款方式组合。换产品类型、换取件方式或改付款方式。
+body: |
+  【报错原文】下单时报「下单方式不符合」。
+
+  【原因】所下的**产品类型不支持**你选的取件方式或付款方式。
+  常见是：不支持「下 call（上门取件）」、
+  不支持「到付」、不支持「转第三方付」。
+
+  【怎么改（三选一或组合）】
+  1. 换产品类型：换成支持该付款/取件方式的产品
+  2. 换取件方式：比如不支持上门就改自送/自联取件
+  3. 改付款方式：比如不支持到付就改寄付
+
+  【排查顺序】
+  先看付款方式是「寄付/到付/第三方付」哪一种，
+  再对照该产品支持的付款方式；
+  实在不确定就问销售这个产品支持哪些组合。
+
+  【提示】这是产品本身的组合限制，不是系统故障，
+  也不用去改下单选项配置。
+anchors: [下单方式不符合, 下单方式不支持, 产品不支持到付, 不支持下call, 转第三方付, 取件方式, 付款方式不符]
+module: 顺店通
+entry_path: 订单管理 → 新建订单
+roles: [订单操作员, 客服]
+permissions: []
+source_ref:
+  - 顺店通-面客资料库/顺店通常见问题集-客服.docx#Q：下单报下单方式不符合
+  - eps-store-core-united-store-be/UnitedOrderServiceImpl.java#L3488
+owner: "01415465"
+verified_at: 2026-11-24
+expires_at: 2027-05-24
+related: [order-task-create, order-glossary-order-fields, sdt-trouble-biz-type-unavailable]

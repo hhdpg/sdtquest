@@ -33,4 +33,4 @@ source_ref: ["knowledge/rules/business-rules.md#1.10"]
 owner: "01415465"
 verified_at: 2026-11-24
 expires_at: 2027-05-24
-related: [order-glossary-waybill]
+related: [order-task-export-pod, order-glossary-waybill]

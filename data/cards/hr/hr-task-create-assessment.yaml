@@ -28,4 +28,4 @@ source_ref: ["顺店通-面客资料库/HRMI/测评中台-第三方测评操作�
 owner: "01415465"
 verified_at: 2026-11-24
 expires_at: 2027-05-24
-related: [hr-rule-assessment-publish, hr-task-import-participants]
+related: [hr-rule-assessment-publish, hr-task-import-participants, hr-trouble-no-type, hr-task-track-assessment]

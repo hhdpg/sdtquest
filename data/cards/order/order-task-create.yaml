@@ -15,7 +15,8 @@ body: |
   5. 点页面底部「下单」提交
 
   【会被拦下的情况】
-  · 取件时间必须晚于当前时间 **2 小时以上**，否则创建失败
+  · 取件时段选得太近（小于「当前小时 + 2」）会被拒，
+    提示「取件时间太近，多给小哥留点时间吧，请重新选择」
   · 同一客户订单号已存在且状态不是「导入」的，直接拒单
   · 货物数量不填或填 0，系统会**按 1 件**处理
   · 跨境单的货物数量必须等于报关明细项数量之和
@@ -34,4 +35,4 @@ source_ref:
 owner: "01415465"
 verified_at: 2026-11-24
 expires_at: 2027-05-24
-related: [order-task-config-options, order-glossary-order-fields]
+related: [order-task-config-options, order-glossary-order-fields, order-task-query-waybill, sdt-task-scenario-code, order-trouble-no-permission, order-trouble-pick-time, sdt-trouble-no-phone]

@@ -1,0 +1,33 @@
+card_id: sdt-trouble-miniapp-no-access
+type: trouble
+title: 小程序查快递提示「用户无权访问」怎么办？
+one_liner: 先查角色有没有查快递权限；有权限还是报错，就是首次登录没改密码，改完重登。
+body: |
+  【报错原文】小程序查快递提示「用户无权访问」
+  （有时带接口路径 /d-anited-store-wechat/api/queryexp/list）。
+
+  【按顺序排两个原因】
+  1. **角色没勾查快递权限**
+     → 系统管理 → 角色管理 → 找到该账号的角色
+       → 配置权限，勾上查快递相关权限
+  2. **首次登录没修改过密码**
+     → 首次登录必须先改密码再重登，
+       否则查快递接口会拦你。
+       改完密码后重新登录再试。
+
+  【处理顺序】
+  先看角色权限，没问题再改密码重登，两个都排除基本就通了。
+
+  【提示】这条和「下单没有权限」不是一回事：
+  下单没权限是下单单据权限，这里是「查快递」的访问权限，
+  但也可能在同一个角色里一起配。
+anchors: [用户无权访问, 小程序查快递报错, 查快递无权限, 首次登录改密码, queryexp, 查快递权限]
+module: 顺店通
+entry_path: 小程序 → 查快递
+roles: [店长, 店员, 一级组织管理员]
+permissions: []
+source_ref: ["顺店通-面客资料库/顺店通常见问题集-客服.docx#Q：小程序查快递提示用户无权访问"]
+owner: "01415465"
+verified_at: 2026-11-24
+expires_at: 2027-05-24
+related: [sdt-rule-role-permission, sdt-trouble-no-order-permission, sdt-trouble-reset-password]
