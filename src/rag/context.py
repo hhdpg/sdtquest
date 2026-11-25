@@ -108,11 +108,10 @@ class ContextAssembler:
 
             doc_parts = [f"【文档{i}】{doc.title}"]
 
-            # 添加页面信息
+            # 添加页面信息（只给菜单名，不给代码路由：
+            # 前端路由如 /adiBus/order 业务人员看不懂，且会被模型照抄进答案）
             if doc.page_name:
-                doc_parts.append(f"页面: {doc.page_name}")
-            if doc.page_path:
-                doc_parts.append(f"路径: {doc.page_path}")
+                doc_parts.append(f"所属模块: {doc.page_name}")
 
             # 添加内容
             doc_parts.append(f"内容: {content}")
