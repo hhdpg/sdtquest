@@ -64,6 +64,56 @@ make run
 
 应用将在 `http://localhost:8000` 启动。
 
+## 切换 LLM 供应商（本地 / 远程）
+
+支持本地 Ollama 与远程智谱 GLM 两套模型，可随时切换。
+
+**1. 配置**
+
+```bash
+# .env
+LLM_PROVIDER=local          # 启动时默认用哪个：local / glm
+GLM_API_KEY=your_key_here   # 用 glm 时必填，申请: https://bigmodel.cn
+GLM_MODEL=glm-4-flash-250414
+```
+
+**免费模型选型（实测 2026-11）**
+
+| 模型 | 能力 | 稳定性 | 结论 |
+|---|---|---|---|
+| glm-4.7-flash | 30B SOTA，最强 | ❌ 高峰期限流严重（连续 3 次 429）| 作降级备选 |
+| glm-4-flash-250414 | 够用 | ✅ 稳定（每次 <2s）| **默认** |
+| glm-4.5-flash | 中等 | ❌ 限流严重 | 作降级备选 |
+| glm-z1-flash | 推理型 | 输出含 `<think>` 标签 | 不建议 |
+
+已内置 **429 自动降级**：主模型被限流时按 `GLM_FALLBACK_MODELS`
+顺序切换，任一成功即返回（实测 0.9 秒内完成降级）。
+另默认关闭思考模式（`GLM_THINKING=false`），避免推理过程吃光输出配额。
+
+**2. 两套索引必须分别构建**
+
+两个模型的向量维度与语义空间不同，不能共用一份索引：
+
+```bash
+make build-index                 # 本地 bge-m3 → knowledge_base
+make build-index provider=glm    # GLM embedding-3 → knowledge_base_glm
+make build-index provider=all    # 两份都建
+```
+
+**3. 运行时切换（无需重启）**
+
+```bash
+curl localhost:8000/api/llm/status                       # 查看当前 provider 与索引条数
+curl -X POST localhost:8000/api/llm/switch \
+     -H 'Content-Type: application/json' \
+     -d '{"provider":"glm"}'                              # 切换
+```
+
+切换会同时更换对话模型与配套索引。若目标索引为空会返回 409 并提示先建库，
+避免切过去检索不到知识（可加 `"force":true` 强制）。
+
+> 运行时切换只影响当前进程，重启后以 `.env` 的 `LLM_PROVIDER` 为准。
+
 ## 项目结构
 
 ```

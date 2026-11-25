@@ -1,6 +1,6 @@
 # Makefile for dingtalk-qa-bot
 
-.PHONY: install run dev test lint format build-knowledge parse-code clean push
+.PHONY: install run dev test lint format build-knowledge build-index parse-code clean push
 
 # 安装依赖
 install:
@@ -34,6 +34,13 @@ format:
 # 构建知识库
 build-knowledge:
 	uv run scripts/build_knowledge.py
+
+# 构建卡片向量索引（默认本地；可选 provider=glm 或 all）
+# 用法: make build-index              → 本地 bge-m3
+#       make build-index provider=glm → 远程 GLM embedding-3
+#       make build-index provider=all → 两份都建
+build-index:
+	uv run scripts/build_index.py --provider $(or $(provider),local)
 
 # 解析代码
 parse-code:
