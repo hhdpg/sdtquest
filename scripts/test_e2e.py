@@ -26,6 +26,7 @@ from src.rag.card_scoring import card_to_dict
 from src.rag.embedding import EmbeddingService
 from src.rag.retriever import HybridRetriever
 from src.rag.vectorstore import ChromaVectorStore
+from src.llm.factory import collection_for
 from scripts.eval_cards import CASES, REAL_QUESTIONS
 
 # 卡型 → KnowledgeType 的映射（写入向量库时用）
@@ -78,25 +79,26 @@ def to_knowledge_item(card: dict) -> KnowledgeItem:
     )
 
 
-async def build_index(cards: list[dict], clear: bool = True) -> int:
+async def build_index(cards: list[dict], clear: bool = True, provider: str = "local") -> int:
     """
-    把卡片写入向量库。
+    把卡片写入指定 provider 的向量库。
 
     Args:
         cards: 卡片列表
         clear: 是否先清空
+        provider: local（bge-m3）/ glm（embedding-3）
 
     Returns:
         写入的条目数
     """
-    store = ChromaVectorStore()
-    embed = EmbeddingService()
+    store = ChromaVectorStore(collection_name=collection_for(provider))
+    embed = EmbeddingService.for_provider(provider)
 
     if clear:
-        print("🗑️  清空向量库...")
+        print(f"🗑️  清空向量库 [{store.collection_name}]...")
         await store.clear()
 
-    print(f"🔢 向量化 {len(cards)} 张卡片...")
+    print(f"🔢 [{provider}] 向量化 {len(cards)} 张卡片...")
     items = [to_knowledge_item(c) for c in cards]
     docs = [it.content for it in items]
 
@@ -106,18 +108,21 @@ async def build_index(cards: list[dict], clear: bool = True) -> int:
 
     await store.add(items)
     count = await store.count()
-    print(f"✅ 入库 {len(items)} 条，向量库现有 {count} 条")
+    print(f"✅ 入库 {len(items)} 条到 [{store.collection_name}]，现有 {count} 条")
     return count
 
 
-async def run_e2e(cards: list[dict]) -> tuple[int, int, int, int]:
+async def run_e2e(cards: list[dict], provider: str = "local") -> tuple[int, int, int, int]:
     """
     跑端到端检索。
 
     Returns:
         (本域正确数, 本域总数, 跨域命中数, 跨域总数)
     """
-    retriever = HybridRetriever()
+    retriever = HybridRetriever(
+        vectorstore=ChromaVectorStore(collection_name=collection_for(provider)),
+        embedding=EmbeddingService.for_provider(provider),
+    )
 
     print("\n【本域问题】")
     ok = 0
@@ -162,9 +167,9 @@ async def main_async(args) -> int:
     if args.no_build:
         print("（跳过建库，使用现有索引）")
     else:
-        await build_index(cards, clear=args.rebuild or True)
+        await build_index(cards, clear=args.rebuild or True, provider=args.provider)
 
-    ok, total, hit, real_total = await run_e2e(cards)
+    ok, total, hit, real_total = await run_e2e(cards, provider=args.provider)
 
     rate = ok / total if total else 0
     print("\n" + "=" * 72)
@@ -179,6 +184,10 @@ def main() -> int:
     parser.add_argument("--dir", type=str, default="data/cards")
     parser.add_argument("--rebuild", action="store_true", help="重建索引")
     parser.add_argument("--no-build", action="store_true", help="跳过建库")
+    parser.add_argument(
+        "--provider", choices=["local", "glm"], default="local",
+        help="使用哪个供应商的向量库与 embedding（默认 local）",
+    )
     args = parser.parse_args()
 
     logger.remove()

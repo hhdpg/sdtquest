@@ -137,6 +137,7 @@ class QAService:
         session_manager: SessionManager | None = None,
         standard_temperature: float | None = None,
         flexible_temperature: float | None = None,
+        provider_manager: Any | None = None,
     ):
         """
         初始化问答服务。
@@ -149,9 +150,12 @@ class QAService:
             session_manager: 会话管理器（可选，未提供则不使用对话历史）
             standard_temperature: 标准操作类温度，默认从配置读取
             flexible_temperature: 灵活推理类温度，默认从配置读取
+            provider_manager: LLM 供应商管理器（可选）。传入后每次问答取
+                当前 provider 的客户端，实现运行时切换。
         """
         self.llm = llm
         self.rag_pipeline = rag_pipeline
+        self.provider_manager = provider_manager
         self.question_repo = question_repo
         self.classifier = classifier
         self.session_manager = session_manager
@@ -414,10 +418,14 @@ class QAService:
             max_tokens=settings.LLM_MAX_TOKENS,
         )
 
-        answer_text = await self.llm.generate(prompt, options)
+        # 有供应商管理器时取当前 provider 的客户端，支持运行时切换；
+        # 否则用注入的固定客户端（便于测试与独立使用）。
+        llm = self.provider_manager.llm if self.provider_manager is not None else self.llm
+        answer_text = await llm.generate(prompt, options)
 
         logger.debug(
-            "LLM 生成完成 | text_len={} | temperature={}",
+            "LLM 生成完成 | provider={} | text_len={} | temperature={}",
+            self.provider_manager.current if self.provider_manager is not None else "fixed",
             len(answer_text),
             temperature,
         )

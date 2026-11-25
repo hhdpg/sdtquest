@@ -1,46 +1,76 @@
 """Embedding 服务模块
 
-封装 bge-m3 向量化功能，支持查询时的 instruction prefix。
+封装文本向量化功能，支持：
+- 本地 Ollama bge-m3（1024 维，查询需 instruction prefix）
+- 远程智谱 GLM embedding-3（维度可配，无需 prefix）
+
+两种模型的语义空间与维度不同，构建的向量库必须隔离，
+通过 EmbeddingService.for_provider() 按 provider 创建。
 """
 
 from loguru import logger
 
+from src.config import settings
 from src.domain.exceptions import LLMServiceError
-from src.llm.client import OllamaClient
 
 
 class EmbeddingService:
     """
     Embedding 服务
 
-    封装 bge-m3 向量化功能，提供文本向量化接口。
+    封装文本向量化，屏蔽不同 provider 的差异（prefix、批大小）。
 
     Attributes:
-        client: Ollama 客户端
-        instruction_prefix: 查询时的指令前缀（bge-m3 要求）
+        client: LLM 客户端（需实现 embed 方法）
+        instruction_prefix: 查询时的指令前缀（仅 bge-m3 需要）
     """
 
     # bge-m3 查询时的 instruction prefix
     QUERY_INSTRUCTION = "Represent this sentence for searching relevant passages: "
 
-    # 向量化批大小：过大会让请求体超出 Ollama 限制（HTTP 400）
+    # 向量化批大小：过大会让请求体超出服务端限制（HTTP 400）
     EMBED_BATCH_SIZE = 10
 
     def __init__(
         self,
-        client: OllamaClient | None = None,
+        client=None,
         add_query_prefix: bool = True,
     ):
         """
         初始化 Embedding 服务
 
         Args:
-            client: Ollama 客户端，默认创建新实例
+            client: LLM 客户端，默认创建本地 Ollama 客户端
             add_query_prefix: 是否在查询时添加 instruction prefix
         """
-        self.client = client or OllamaClient()
+        if client is None:
+            from src.llm.client import OllamaClient
+            client = OllamaClient()
+        self.client = client
         self.add_query_prefix = add_query_prefix
         logger.info("EmbeddingService 初始化 | add_query_prefix={}", add_query_prefix)
+
+    @classmethod
+    def for_provider(cls, provider: str) -> "EmbeddingService":
+        """
+        按 provider 创建配套的 Embedding 服务。
+
+        不同模型的 prefix 要求不同，这里集中处理，避免调用方到处判断。
+
+        Args:
+            provider: "local"（bge-m3）或 "glm"（embedding-3）
+
+        Returns:
+            EmbeddingService 实例
+        """
+        if provider == "glm":
+            from src.llm.glm_client import GLMClient
+            # embedding-3 不要求查询 prefix
+            return cls(client=GLMClient(), add_query_prefix=False)
+        if provider == "local":
+            from src.llm.client import OllamaClient
+            return cls(client=OllamaClient(), add_query_prefix=True)
+        raise LLMServiceError(f"未知的 embedding provider: {provider}")
 
     async def embed_documents(self, texts: list[str]) -> list[list[float]]:
         """

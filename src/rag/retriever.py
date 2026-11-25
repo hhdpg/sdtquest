@@ -42,6 +42,7 @@ class HybridRetriever:
         vectorstore: ChromaVectorStore | None = None,
         embedding: EmbeddingService | None = None,
         rrf_k: int = 60,
+        provider_manager=None,
     ):
         """
         初始化混合检索器
@@ -50,11 +51,41 @@ class HybridRetriever:
             vectorstore: 向量存储实例
             embedding: Embedding 服务实例
             rrf_k: RRF 算法的 k 参数（默认 60）
+            provider_manager: LLM 供应商管理器。传入后可随运行时切换
+                自动更换向量集合与 embedding；不传则使用固定实例。
         """
-        self.vectorstore = vectorstore or ChromaVectorStore()
-        self.embedding = embedding or EmbeddingService()
+        self._fixed_vectorstore = vectorstore
+        self._fixed_embedding = embedding or EmbeddingService()
+        self.provider_manager = provider_manager
+        self._provider_stores: dict[str, ChromaVectorStore] = {}
         self.rrf_k = rrf_k
-        logger.info("HybridRetriever 初始化 | rrf_k={}", rrf_k)
+        logger.info(
+            "HybridRetriever 初始化 | rrf_k={} | provider_manager={}",
+            rrf_k, type(provider_manager).__name__ if provider_manager else None,
+        )
+
+    @property
+    def embedding(self) -> EmbeddingService:
+        """当前生效的 Embedding 服务（随 provider 切换）"""
+        if self.provider_manager is not None:
+            return self.provider_manager.embedding
+        return self._fixed_embedding
+
+    @property
+    def vectorstore(self) -> ChromaVectorStore:
+        """
+        当前生效的向量存储。
+
+        有 provider_manager 时按其集合名取（按 provider 缓存实例），
+        保证问答用的是与当前 embedding 配套的那个索引。
+        """
+        if self.provider_manager is None:
+            return self._fixed_vectorstore or ChromaVectorStore()
+
+        coll = self.provider_manager.collection
+        if coll not in self._provider_stores:
+            self._provider_stores[coll] = ChromaVectorStore(collection_name=coll)
+        return self._provider_stores[coll]
 
     async def retrieve(
         self,

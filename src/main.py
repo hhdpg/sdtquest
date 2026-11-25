@@ -137,22 +137,26 @@ def create_services(infra: dict) -> dict:
     """
     logger.info("创建业务服务...")
 
-    # ── LLM 客户端 ──
-    from src.llm.client import OllamaClient
+    # ── LLM 供应商管理器（本地 Ollama / 远程 GLM 可切换）──
+    from src.llm.factory import LLMProviderManager
 
-    llm_client = OllamaClient()
-    logger.info("Ollama 客户端初始化完成 | model={}", settings.OLLAMA_MODEL)
+    provider_manager = LLMProviderManager()
+    llm_client = provider_manager.llm
+    logger.info(
+        "LLM 供应商初始化完成 | provider={} | model={}",
+        provider_manager.current, provider_manager.bundle.model,
+    )
 
-    # ── Embedding 服务 ──
-    from src.rag.embedding import EmbeddingService
+    # ── Embedding 服务（与当前 provider 配套）──
+    embedding_service = provider_manager.embedding
+    logger.info("Embedding 服务初始化完成 | collection={}", provider_manager.collection)
 
-    embedding_service = EmbeddingService()
-    logger.info("Embedding 服务初始化完成")
-
-    # ── RAG 管道 ──
+    # ── RAG 管道（注入 manager，使检索随 provider 切换）──
     from src.rag.pipeline import RAGPipeline
+    from src.rag.retriever import HybridRetriever
 
-    rag_pipeline = RAGPipeline()
+    retriever = HybridRetriever(provider_manager=provider_manager)
+    rag_pipeline = RAGPipeline(retriever=retriever)
     logger.info("RAG 管道初始化完成")
 
     # ── 问题分类器 ──
@@ -170,6 +174,7 @@ def create_services(infra: dict) -> dict:
         question_repo=infra["question_repo"],
         classifier=classifier,  # 注入问题分类器
         session_manager=None,  # 会话管理器待 Bot 模块完成后注入
+        provider_manager=provider_manager,
     )
     logger.info("QAService 初始化完成")
 
@@ -194,6 +199,7 @@ def create_services(infra: dict) -> dict:
 
     return {
         "llm_client": llm_client,
+        "provider_manager": provider_manager,
         "embedding_service": embedding_service,
         "rag_pipeline": rag_pipeline,
         "qa_service": qa_service,
@@ -379,6 +385,7 @@ async def lifespan(app):
     app.state.qa_service = services["qa_service"]
     app.state.knowledge_service = services["knowledge_service"]
     app.state.analytics_service = services["analytics_service"]
+    app.state.provider_manager = services["provider_manager"]
     app.state.bot_router = bot_router
     app.state.bot_task = bot_task
     app.state.session_manager = getattr(services["qa_service"], "session_manager", None)

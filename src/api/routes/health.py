@@ -5,7 +5,7 @@
 
 from pathlib import Path
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from loguru import logger
 
 from src.config import settings
@@ -35,7 +35,7 @@ async def health_check() -> dict[str, str]:
 
 
 @router.get("/health/detailed", summary="详细健康检查")
-async def detailed_health_check() -> dict:
+async def detailed_health_check(request: Request) -> dict:
     """
     详细健康检查接口。
 
@@ -44,12 +44,16 @@ async def detailed_health_check() -> dict:
     Returns:
         详细状态信息字典
     """
-    # 检查各组件状态
+    # 以运行时当前 provider 为准（可能已被 /api/llm/switch 切换），
+    # 避免把未启用的服务（如本地 Ollama）判为故障。
+    manager = getattr(request.app.state, "provider_manager", None)
+    provider = manager.current if manager is not None else settings.LLM_PROVIDER
+
     checks = {
         "app": _check_app(),
         "database": _check_database(),
         "chromadb": _check_chromadb(),
-        "ollama": await _check_ollama(),
+        "llm": await _check_llm(provider),
     }
 
     # 总体状态：所有组件都正常时为 "ok"，否则为 "degraded"
@@ -96,15 +100,34 @@ def _check_chromadb() -> dict[str, str]:
         return {"status": "error", "error": str(e)}
 
 
-async def _check_ollama() -> dict[str, str]:
-    """检查 Ollama 服务状态"""
+async def _check_llm(provider: str) -> dict[str, str]:
+    """
+    按当前 provider 检查 LLM 服务状态。
+
+    - local: 探测本地 Ollama 的 /api/tags
+    - glm: 校验 API Key 是否已配置（不发起计费请求）
+
+    Args:
+        provider: 当前使用的 provider
+
+    Returns:
+        组件状态字典
+    """
+    if provider == "glm":
+        if not settings.GLM_API_KEY:
+            return {"status": "error", "provider": "glm", "error": "GLM_API_KEY 未配置"}
+        return {"status": "ok", "provider": "glm", "model": settings.GLM_MODEL}
+
     try:
         from src.shared.http import create_direct_client
 
         async with create_direct_client(timeout=5.0) as client:
             response = await client.get(f"{settings.OLLAMA_BASE_URL}/api/tags")
             if response.status_code == 200:
-                return {"status": "ok", "url": settings.OLLAMA_BASE_URL}
-            return {"status": "error", "url": settings.OLLAMA_BASE_URL, "error": f"HTTP {response.status_code}"}
+                return {"status": "ok", "provider": "local", "url": settings.OLLAMA_BASE_URL}
+            return {
+                "status": "error", "provider": "local",
+                "url": settings.OLLAMA_BASE_URL, "error": f"HTTP {response.status_code}",
+            }
     except Exception as e:
-        return {"status": "error", "url": settings.OLLAMA_BASE_URL, "error": str(e)}
+        return {"status": "error", "provider": "local", "error": str(e)}

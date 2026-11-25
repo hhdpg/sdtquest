@@ -145,7 +145,7 @@ def _register_routes(app: FastAPI) -> None:
     Args:
         app: FastAPI 应用实例
     """
-    from src.api.routes import analytics, chat, health, knowledge
+    from src.api.routes import analytics, chat, health, knowledge, llm
 
     # 健康检查（无前缀）
     app.include_router(health.router)
@@ -154,6 +154,7 @@ def _register_routes(app: FastAPI) -> None:
     app.include_router(chat.router, prefix="/api", tags=["chat"])
     app.include_router(knowledge.router, prefix="/api", tags=["knowledge"])
     app.include_router(analytics.router, prefix="/api", tags=["analytics"])
+    app.include_router(llm.router, prefix="/api", tags=["llm"])
 
     logger.debug("API 路由注册完成")
 
