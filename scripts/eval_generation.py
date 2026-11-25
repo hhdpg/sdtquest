@@ -159,14 +159,21 @@ def find_leaks(text: str) -> list[str]:
     return sorted(t for t in found if t not in ALLOWED_TERMS)
 
 
-async def evaluate_case(case: GoldenCase, pipeline, llm) -> CaseResult:
+async def evaluate_case(
+    case: GoldenCase, pipeline, llm, repeats: int = 1
+) -> CaseResult:
     """
     跑一条黄金集用例。
+
+    同一 Prompt 多次生成时模型可能不稳定（实测「收单商品怎么上架」
+    5 次里有 1 次编造了不存在的按钮）。repeats>1 时取**最差一次**的结果，
+    这样偶发退化不会被平均值掩盖。
 
     Args:
         case: 用例
         pipeline: RAGPipeline
         llm: 当前 provider 的 LLM 客户端
+        repeats: 同一条用例生成几次
 
     Returns:
         CaseResult
@@ -186,22 +193,42 @@ async def evaluate_case(case: GoldenCase, pipeline, llm) -> CaseResult:
     )
     rag = await pipeline.query(question)
 
-    if rag.documents:
-        result.retrieved_card = rag.documents[0].id
-        answer = await llm.generate(
-            rag.prompt, GenerateOptions(temperature=0.3)
-        )
-        result.answer = answer.strip()
-        result.key_facts_hit = sum(
-            1 for fact in case.key_facts if fact in answer
-        )
-        result.leaked = find_leaks(answer)
+    if not rag.documents:
+        return result
 
-        if not result.retrieve_ok:
-            logger.warning(
-                "检索未命中期望卡 | question={} | expected={} | got={}",
-                case.question, case.expected_card, result.retrieved_card,
-            )
+    result.retrieved_card = rag.documents[0].id
+
+    worst_hit = -1
+    worst_answer = ""
+    worst_leaks: list[str] = []
+    for _ in range(max(1, repeats)):
+        answer = (
+            await llm.generate(rag.prompt, GenerateOptions(temperature=0.3))
+        ).strip()
+
+        hit = sum(1 for fact in case.key_facts if fact in answer)
+        leaks = find_leaks(answer)
+
+        # 命中更少 → 更差；命中相同但有泄漏、此前没泄漏 → 更差
+        is_worse = (
+            worst_hit < 0
+            or hit < worst_hit
+            or (hit == worst_hit and leaks and not worst_leaks)
+        )
+        if is_worse:
+            worst_hit = hit
+            worst_answer = answer
+            worst_leaks = leaks
+
+    result.key_facts_hit = max(worst_hit, 0)
+    result.answer = worst_answer
+    result.leaked = worst_leaks
+
+    if not result.retrieve_ok:
+        logger.warning(
+            "检索未命中期望卡 | question={} | expected={} | got={}",
+            case.question, case.expected_card, result.retrieved_card,
+        )
 
     return result
 
@@ -232,12 +259,13 @@ async def evaluate_refusal(question: str, pipeline, llm) -> tuple[str, str, bool
     return question, answer, REFUSAL_MARKER in answer
 
 
-async def run_provider(provider: str) -> ProviderReport:
+async def run_provider(provider: str, repeats: int = 1) -> ProviderReport:
     """
     跑完一个 provider 的全部用例。
 
     Args:
         provider: local / glm
+        repeats: 每条用例生成几次（取最差一次）
 
     Returns:
         ProviderReport
@@ -255,7 +283,9 @@ async def run_provider(provider: str) -> ProviderReport:
 
     report = ProviderReport(provider=provider)
     for case in GOLDEN_CASES:
-        report.cases.append(await evaluate_case(case, pipeline, manager.llm))
+        report.cases.append(
+            await evaluate_case(case, pipeline, manager.llm, repeats=repeats)
+        )
         print(f"  · {case.question}")
 
     for question in REFUSAL_CASES:
@@ -323,9 +353,10 @@ async def main_async(args) -> int:
 
     reports: list[ProviderReport] = []
     for provider in providers:
+        extra = f"，每条生成 {args.repeats} 次取最差" if args.repeats > 1 else ""
         print(f"\n>>> 评测 {provider}（{len(GOLDEN_CASES)} 条黄金集 "
-              f"+ {len(REFUSAL_CASES)} 条拒答）")
-        reports.append(await run_provider(provider))
+              f"+ {len(REFUSAL_CASES)} 条拒答{extra}）")
+        reports.append(await run_provider(provider, repeats=args.repeats))
 
     for report in reports:
         print_report(report)
@@ -369,6 +400,13 @@ def main() -> int:
     )
     parser.add_argument(
         "--gate", action="store_true", help="作为门禁运行，不达标退出码 1"
+    )
+    parser.add_argument(
+        "--repeats",
+        type=int,
+        default=1,
+        help="每条用例生成几次并取最差结果。模型存在随机性，"
+             "门禁建议用 3，避免偶发编造被平均值掩盖",
     )
     args = parser.parse_args()
 

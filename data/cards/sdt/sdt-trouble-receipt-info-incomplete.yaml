@@ -1,0 +1,38 @@
+card_id: sdt-trouble-receipt-info-incomplete
+type: trouble
+title: 提示「存在收件信息不完善的发货单」出不了运单怎么办？
+one_liner: 同一发货单下多个订单的收件组织/人/电话不一致，系统判异常，先补全收件信息再获取运单。
+body: |
+  【报错原文】
+  「存在【收件信息】不完善的发货单，请先补充收件信息后再获取运单」
+
+  【原因】
+  一张发货单下挂着多个订单，这几个订单的
+  **收件组织、收件人、收件电话**只要有一项不一致，
+  这张发货单就被标记异常，不能下单出运单。
+
+  常见于：顾客扫码下单时没填全，或不同顾客填了不同信息
+  却被归到同一张发货单上。
+
+  【怎么处理】
+  1. 进收单中心 → 发货单管理，找到被标记异常的单
+  2. 把收件组织 / 收件人 / 收件电话**补齐成一致**
+  3. 再回来发货、获取运单
+
+  【预防】
+  顾客扫码下单时，收件信息一次填全，别留空。
+
+  【说明】发货单怎么合并、异常怎么拆分属于业务判断，
+  以收单中心实际单据为准，我不能替你查。
+anchors: [收件信息不完善, 存在收件信息不完善的发货单, 出不了运单, 发货单异常, 收单中心异常, 收件信息补充]
+module: 顺店通-供应链
+entry_path: 收单中心 → 发货单管理
+roles: [店长, 店员, 运营]
+permissions: []
+source_ref:
+  - eps-store-core-united-store-be/UsBxOrderInvoiceServiceImpl.java#L1668
+  - eps-store-core-united-store-be/CustomerOrdersServiceImpl.java#L688
+owner: "01415465"
+verified_at: 2026-11-25
+expires_at: 2027-05-25
+related: [sdt-flow-quick-receipt, sdt-task-receipt-goods, order-task-create]

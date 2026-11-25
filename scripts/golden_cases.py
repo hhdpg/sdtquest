@@ -59,15 +59,11 @@ GOLDEN_CASES: tuple[GoldenCase, ...] = (
         "下单类型有哪些区别",
         "order-glossary-order-types",
         ("标准", "异地代发", "调拨", "退货"),
-        # order-glossary-order-fields 正文也讲下单类型差异，内容边界重叠。
-        # 实测命中它时要点仍 4/4 全对，是卡片设计问题而非检索退化，记在待办里。
-        acceptable_cards=("order-glossary-order-fields",),
     ),
     GoldenCase(
         "下单类型怎么选",
         "order-glossary-order-types",
         ("标准", "异地代发", "调拨", "退货"),
-        acceptable_cards=("order-glossary-order-fields", "order-task-create"),
     ),
     GoldenCase(
         "怎么取消订单",
@@ -140,6 +136,88 @@ GOLDEN_CASES: tuple[GoldenCase, ...] = (
         "测评怎么导入参与人员",
         "hr-task-import-participants",
         ("导入",),
+    ),
+    # 供应链（2026-11-25 补卡）
+    GoldenCase(
+        "怎么开通外部WMS",
+        "sdt-task-wms-setup",
+        ("百川", "仓库"),
+    ),
+    GoldenCase(
+        "WMS对接的秘钥怎么填",
+        "sdt-task-wms-setup",
+        ("秘钥",),
+    ),
+    GoldenCase(
+        "物流计价规则怎么配",
+        "sdt-task-logistics-pricing",
+        ("标快", "特快", "卡航"),
+    ),
+    GoldenCase(
+        "计价对账是干什么的",
+        "sdt-task-logistics-pricing",
+        ("计价",),
+    ),
+    GoldenCase(
+        "订单执行统计能看什么",
+        "sdt-task-order-execution-stats",
+        ("在途路由",),
+    ),
+    GoldenCase(
+        "要货单怎么建",
+        "sdt-task-requirement-goods-list",
+        ("发货仓库",),
+    ),
+    GoldenCase(
+        "要货单和发货单有什么区别",
+        "sdt-glossary-supply-concepts",
+        ("要货单", "发货单"),
+    ),
+    GoldenCase(
+        "补货建议会自动生成要货单吗",
+        "sdt-glossary-supply-concepts",
+        ("不会",),
+    ),
+    GoldenCase(
+        "为什么发货仓库选不到",
+        "sdt-rule-supply-tags",
+        ("仓库", "标签"),
+    ),
+    GoldenCase(
+        "提示收件信息不完善出不了运单",
+        "sdt-trouble-receipt-info-incomplete",
+        ("收件",),
+    ),
+    GoldenCase(
+        "收单商品在哪里管理",
+        "sdt-task-receipt-goods",
+        ("收单商品管理",),
+    ),
+    # 运单管理（2026-11-25 补卡）
+    GoldenCase(
+        "运单审批怎么操作",
+        "sdt-task-waybill-approval",
+        ("审核", "驳回"),
+    ),
+    GoldenCase(
+        "审批进度在哪查",
+        "sdt-task-waybill-approval",
+        ("审批进度查询",),
+    ),
+    GoldenCase(
+        "合单发货怎么用",
+        "sdt-task-waybill-merge",
+        ("合并",),
+    ),
+    GoldenCase(
+        "自动合单规则怎么配",
+        "sdt-task-waybill-merge",
+        ("自动合单规则配置", "一级组织管理员"),
+    ),
+    GoldenCase(
+        "小程序下单支持快递包裹还是同城急送",
+        "sdt-task-mini-program-order",
+        ("快递包裹", "同城急送"),
     ),
 )
 

@@ -49,6 +49,40 @@ MIN_BODY_CHARS = 60
 MAX_BODY_CHARS = 600
 MIN_ANCHORS = 3
 
+# 预留字段：卡片 schema 里有、填写率也不低，但检索与 Prompt 组装都不读。
+# 保留是为了将来做「按提问人角色过滤」时不必回填历史卡片，
+# 但必须让人知道它们当前不生效——字段存在却不生效比字段不存在更危险。
+RESERVED_FIELDS = ("roles", "permissions")
+
+
+def check_reserved_fields(cards: list[tuple[Path, dict]]) -> list[str]:
+    """
+    检查预留字段是否被误当成生效字段使用。
+
+    当前唯一能自动判定的风险：卡片的 permissions 里写了检索过滤
+    （如 module=xxx），但检索层根本不读该字段，会造成「以为做了权限隔离」。
+
+    这里只做提示，不阻断：字段本身合法，问题在使用者预期。
+
+    Args:
+        cards: 卡片列表
+
+    Returns:
+        提示信息列表（不计入失败）
+    """
+    notes: list[str] = []
+    filled = sum(
+        1 for _, c in cards
+        if any(c.get(f) for f in RESERVED_FIELDS)
+    )
+    if filled:
+        notes.append(
+            f"{filled}/{len(cards)} 张卡填写了预留字段 "
+            f"{'/'.join(RESERVED_FIELDS)}，当前检索层不读取，"
+            f"不会产生任何权限隔离效果"
+        )
+    return notes
+
 
 def validate_card(card: dict, path: Path) -> list[str]:
     """
@@ -185,6 +219,50 @@ def check_relations(cards: list[tuple[Path, dict]]) -> list[str]:
     return errors
 
 
+def check_expiry(cards: list[tuple[Path, dict]]) -> list[str]:
+    """
+    检查卡片有效期。
+
+    卡片带 expires_at 字段用于声明知识有效期，之前无任何代码读取，
+    会静默老化成错答案。这里在 CI 阶段暴露。
+
+    Args:
+        cards: 卡片列表
+
+    Returns:
+        错误信息列表（已过期为错误；30 天内到期为提示）
+    """
+    from datetime import date, datetime, timedelta
+
+    today = date.today()
+    warn_before = today + timedelta(days=30)
+    errors: list[str] = []
+
+    for path, card in cards:
+        cid = card.get("card_id")
+        raw = card.get("expires_at")
+        if not cid or not raw:
+            continue
+
+        try:
+            if isinstance(raw, datetime):
+                expires = raw.date()
+            elif isinstance(raw, date):
+                expires = raw
+            else:
+                expires = date.fromisoformat(str(raw)[:10])
+        except (TypeError, ValueError):
+            errors.append(f"{cid} expires_at 格式无法解析: {raw}")
+            continue
+
+        if expires < today:
+            errors.append(f"{cid} 已过期（{expires}），需复核更新")
+        elif expires <= warn_before:
+            logger.warning("卡片即将过期 | card={} | expires={}", cid, expires)
+
+    return errors
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="校验知识卡是否符合设计规范")
     parser.add_argument("--dir", type=str, default="data/cards", help="卡片目录")
@@ -244,6 +322,19 @@ def main() -> int:
         print("\n❌ 关联连通性检查")
         for err in rel_errors:
             print(f"   · {err}")
+
+    expiry_errors = check_expiry(all_cards)
+    if expiry_errors:
+        failed += len(expiry_errors)
+        print("\n❌ 有效期检查")
+        for err in expiry_errors:
+            print(f"   · {err}")
+
+    reserved_notes = check_reserved_fields(all_cards)
+    if reserved_notes:
+        print("\nℹ️  预留字段提示（不影响校验结果）")
+        for note in reserved_notes:
+            print(f"   · {note}")
 
     print("\n" + "=" * 64)
     passed = len(files) - failed

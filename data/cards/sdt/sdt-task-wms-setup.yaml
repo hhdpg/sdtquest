@@ -1,0 +1,38 @@
+card_id: sdt-task-wms-setup
+type: task
+title: 怎么开通外部WMS？WMS对接设置的仓库、编码、秘钥怎么填？
+one_liner: 基础配置 → WMS对接设置 → +开通外部WMS，填仓库、对接WMS、WMS编码/秘钥/请求地址后提交。
+body: |
+  【入口】基础配置 → WMS对接设置 → 点【+开通外部WMS】
+
+  【能对接哪些 WMS】
+  目前只支持已经和顺店通完成对接的 WMS，**当前支持百川**。
+  其他 WMS 需要对方先完成对接，否则下拉里选不到。
+
+  【操作步骤】
+  1. 点【+开通外部WMS】
+  2. 填写【基础资料】
+  3. 点【提交】
+
+  【字段怎么填】
+  · **仓库**：从组织管理里选，下拉**只能选到打了【仓库】标签的组织**
+    （组织没打仓库标签，这里选不到，先去组织管理加标签）
+  · **对接WMS**：选已对接的 WMS，目前只有百川
+  · **WMS仓库编码 / 客户ID / 秘钥ID / 秘钥 / 请求地址 / 货主编码**：
+    这 6 项都要 **由 WMS 系统方提供**，不是你随便填的
+
+  【改和删】
+  列表里点【编辑】【删除】可修改或移除已加的 WMS 信息。
+
+  【说明】仓库标签在哪里加、WMS 方给不出编码怎么办，
+  以组织管理和 WMS 提供方为准，我不能替你查。
+anchors: [WMS对接设置, 开通外部WMS, 对接WMS, 百川, WMS仓库编码, 货主编码, 仓库标签, 秘钥ID]
+module: 顺店通-供应链
+entry_path: 基础配置 → WMS对接设置
+roles: [一级组织管理员, IT对接人]
+permissions: []
+source_ref: ["顺店通-面客资料库/顺店通操作手册-1202（含供应链服务）.docx#基础配置-WMS对接设置"]
+owner: "01415465"
+verified_at: 2026-11-25
+expires_at: 2027-05-25
+related: [sdt-task-requirement-goods-list, sdt-task-inventory-query, sdt-task-product-center]
