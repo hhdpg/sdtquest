@@ -17,66 +17,18 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-import yaml
 from loguru import logger
 
-from src.domain.enums import KnowledgeType
-from src.domain.models import KnowledgeItem
 from src.rag.card_scoring import card_to_dict
 from src.rag.embedding import EmbeddingService
 from src.rag.retriever import HybridRetriever
 from src.rag.vectorstore import ChromaVectorStore
 from src.llm.factory import collection_for
+from scripts.card_loader import build_embedding_text, load_cards, to_knowledge_item
 from scripts.eval_cards import CASES, REAL_QUESTIONS
 
-# 卡型 → KnowledgeType 的映射（写入向量库时用）
-TYPE_MAP = {
-    "task": KnowledgeType.PAGE,
-    "rule": KnowledgeType.MANUAL,
-    "trouble": KnowledgeType.MANUAL,
-    "glossary": KnowledgeType.MANUAL,
-    "flow": KnowledgeType.WORKFLOW,
-    "state": KnowledgeType.MANUAL,
-    "faq": KnowledgeType.MANUAL,
-}
-
-
-def load_cards(root: Path) -> list[dict]:
-    """加载卡片"""
-    cards = []
-    for p in sorted(root.rglob("*.yaml")):
-        try:
-            d = yaml.safe_load(p.read_text(encoding="utf-8"))
-        except yaml.YAMLError as e:
-            print(f"⚠️  {p.name} 解析失败: {e}")
-            continue
-        if isinstance(d, dict) and d.get("card_id"):
-            cards.append(d)
-    return cards
-
-
-def to_knowledge_item(card: dict) -> KnowledgeItem:
-    """
-    卡片 dict → KnowledgeItem（写入向量库）。
-
-    关键：把 title + one_liner + body 拼成 content，
-    让向量化能同时捕捉"问题问法"和"答案内容"。
-    """
-    content = f"{card.get('one_liner', '')}\n\n{card.get('body', '')}"
-    # anchors 里可能有 YAML 自动转成数字的项（如 15000），统一转字符串
-    anchors = [str(a) for a in (card.get("anchors") or [])]
-    return KnowledgeItem(
-        id=card["card_id"],
-        type=TYPE_MAP.get(card.get("type", ""), KnowledgeType.MANUAL),
-        title=card.get("title", ""),
-        content=content,
-        page_name=card.get("module", ""),
-        page_path=card.get("entry_path", ""),
-        tags=anchors,
-        source_file="; ".join(str(s) for s in (card.get("source_ref") or [])),
-        one_liner=card.get("one_liner"),
-        module=card.get("module"),
-    )
+# 卡片加载与转换统一走 scripts/card_loader.py，
+# 保证「评估时向量化什么」与「建库时向量化什么」完全一致。
 
 
 async def build_index(cards: list[dict], clear: bool = True, provider: str = "local") -> int:
@@ -100,7 +52,8 @@ async def build_index(cards: list[dict], clear: bool = True, provider: str = "lo
 
     print(f"🔢 [{provider}] 向量化 {len(cards)} 张卡片...")
     items = [to_knowledge_item(c) for c in cards]
-    docs = [it.content for it in items]
+    # 与 build_index.py 用同一份向量化文本（含 title + anchors）
+    docs = [build_embedding_text(c) for c in cards]
 
     embeddings = await embed.embed_documents(docs)
     for it, emb in zip(items, embeddings):

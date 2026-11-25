@@ -29,61 +29,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-import yaml
 from loguru import logger
 
-from src.domain.enums import KnowledgeType
-from src.domain.models import KnowledgeItem
 from src.llm.factory import SUPPORTED_PROVIDERS, collection_for
 from src.rag.embedding import EmbeddingService
 from src.rag.vectorstore import ChromaVectorStore
+from scripts.card_loader import build_embedding_text, load_cards, to_knowledge_item
 
-# 卡型 → KnowledgeType 的映射（写入向量库时用）
-TYPE_MAP = {
-    "task": KnowledgeType.PAGE,
-    "rule": KnowledgeType.MANUAL,
-    "trouble": KnowledgeType.MANUAL,
-    "glossary": KnowledgeType.MANUAL,
-    "flow": KnowledgeType.WORKFLOW,
-    "state": KnowledgeType.MANUAL,
-    "faq": KnowledgeType.MANUAL,
-}
-
-
-def load_cards(root: Path) -> list[dict]:
-    """加载卡片目录下全部 YAML"""
-    cards = []
-    for p in sorted(root.rglob("*.yaml")):
-        try:
-            d = yaml.safe_load(p.read_text(encoding="utf-8"))
-        except yaml.YAMLError as e:
-            print(f"⚠️  {p.name} 解析失败: {e}")
-            continue
-        if isinstance(d, dict) and d.get("card_id"):
-            cards.append(d)
-    return cards
-
-
-def to_knowledge_item(card: dict) -> KnowledgeItem:
-    """
-    卡片 dict → KnowledgeItem。
-
-    把 one_liner + body 拼成 content，让向量化同时捕捉问法与答案。
-    """
-    content = f"{card.get('one_liner', '')}\n\n{card.get('body', '')}"
-    anchors = [str(a) for a in (card.get("anchors") or [])]
-    return KnowledgeItem(
-        id=card["card_id"],
-        type=TYPE_MAP.get(card.get("type", ""), KnowledgeType.MANUAL),
-        title=card.get("title", ""),
-        content=content,
-        page_name=card.get("module", ""),
-        page_path=card.get("entry_path", ""),
-        tags=anchors,
-        source_file="; ".join(str(s) for s in (card.get("source_ref") or [])),
-        one_liner=card.get("one_liner"),
-        module=card.get("module"),
-    )
+# 卡片加载与转换统一走 scripts/card_loader.py，避免与评估脚本两处漂移
 
 
 async def build_for_provider(provider: str, cards: list[dict], clear: bool) -> int:
@@ -109,7 +62,10 @@ async def build_for_provider(provider: str, cards: list[dict], clear: bool) -> i
     items = [to_knowledge_item(c) for c in cards]
     print(f"🔢 [{provider}] 向量化 {len(items)} 张卡片 → {collection}")
 
-    embeddings = await embed.embed_documents([it.content for it in items])
+    # 向量化文本与入库 document 分开：
+    # 向量里要含标题与 anchors（用户问法），document 只存答案正文供 prompt 使用。
+    embed_texts = [build_embedding_text(c) for c in cards]
+    embeddings = await embed.embed_documents(embed_texts)
     for it, emb in zip(items, embeddings):
         it.embedding = emb
 
