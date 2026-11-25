@@ -130,6 +130,53 @@ class TestHybridRetrieverCategoryConfig:
             assert 0.0 < t < 0.75, f"{category} 阈值 {t} 超出余弦相似度合理区间"
 
 
+class TestHybridRetrieverProviderThreshold:
+    """阈值按 provider 分别取值测试
+
+    bge-m3 与 GLM embedding-3 的相似度分布不同（GLM 整体更高），
+    共用一个阈值会误召回，必须各取各的。
+    """
+
+    class _FakeManager:
+        def __init__(self, provider):
+            self.current = provider
+
+    def _make(self, provider):
+        with patch("src.rag.retriever.ChromaVectorStore"), \
+             patch("src.rag.retriever.EmbeddingService"):
+            return HybridRetriever(provider_manager=self._FakeManager(provider))
+
+    def test_glm_uses_glm_thresholds(self):
+        """GLM provider 应使用 GLM 专用阈值"""
+        from src.config import settings
+
+        r = self._make("glm")
+        assert (
+            r._get_threshold_by_category(QuestionCategory.OPERATION_GUIDE)
+            == settings.RAG_THRESHOLD_GLM_STANDARD
+        )
+        assert (
+            r._get_threshold_by_category(QuestionCategory.ANOMALY_TROUBLESHOOT)
+            == settings.RAG_THRESHOLD_GLM_FLEXIBLE
+        )
+
+    def test_local_uses_local_thresholds(self):
+        """本地 provider 应使用 bge-m3 阈值"""
+        from src.config import settings
+
+        r = self._make("local")
+        assert (
+            r._get_threshold_by_category(QuestionCategory.OPERATION_GUIDE)
+            == settings.RAG_THRESHOLD_STANDARD
+        )
+
+    def test_glm_threshold_stricter_than_local(self):
+        """GLM 相似度整体偏高，阈值应不低于本地，否则会误召回"""
+        from src.config import settings
+
+        assert settings.RAG_THRESHOLD_GLM_STANDARD > settings.RAG_THRESHOLD_STANDARD
+
+
 class TestHybridRetrieverRetrieve:
     """检索流程测试"""
 

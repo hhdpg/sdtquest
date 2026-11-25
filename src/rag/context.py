@@ -19,16 +19,20 @@ class ContextAssembler:
 
     Attributes:
         max_history: 最大对话历史轮数
+        provider_manager: LLM 供应商管理器。传入后按当前 provider
+            选择上下文长度预算（GLM 窗口大，可容纳更长的卡片）
     """
 
-    def __init__(self, max_history: int = 3):
+    def __init__(self, max_history: int = 3, provider_manager=None):
         """
         初始化上下文组装器
 
         Args:
             max_history: 最大对话历史轮数
+            provider_manager: LLM 供应商管理器（可选）
         """
         self.max_history = max_history
+        self.provider_manager = provider_manager
         logger.info("ContextAssembler 初始化 | max_history={}", max_history)
 
     def assemble(
@@ -82,6 +86,7 @@ class ContextAssembler:
 
         会按单文档和整体上限截断，避免 prompt 超出模型上下文窗口
         导致回答被截断（9B 模型在超长 prompt 下只输出前几个 token）。
+        GLM 窗口远大于本地模型，使用更宽松的上限。
 
         Args:
             docs: 知识文档列表
@@ -92,13 +97,22 @@ class ContextAssembler:
         if not docs:
             return "（无相关知识）"
 
-        max_doc_chars = settings.RAG_MAX_DOC_CHARS
-        max_total_chars = settings.RAG_MAX_CONTEXT_CHARS
+        glm = (
+            self.provider_manager is not None
+            and self.provider_manager.current == "glm"
+        )
+        max_doc_chars = (
+            settings.RAG_MAX_DOC_CHARS_GLM if glm else settings.RAG_MAX_DOC_CHARS
+        )
+        max_total_chars = (
+            settings.RAG_MAX_CONTEXT_CHARS_GLM if glm
+            else settings.RAG_MAX_CONTEXT_CHARS
+        )
 
         parts = []
         used = 0
         for i, doc in enumerate(docs, 1):
-            content = doc.content
+            content = self._strip_document_header(doc.content)
             if len(content) > max_doc_chars:
                 content = content[:max_doc_chars] + "\n...(内容过长已截断)"
                 logger.debug(
@@ -134,6 +148,36 @@ class ContextAssembler:
             used += len(block)
 
         return "\n\n".join(parts)
+
+    @staticmethod
+    def _strip_document_header(content: str) -> str:
+        """
+        去掉向量库文档里自带的标题/页面/路径/标签行。
+
+        向量库存的 document 是 to_document_string() 的产物，已包含
+        「标题: …\n页面: …\n路径: …\n内容: …\n标签: …」。
+        组装 Prompt 时又拼了一遍标题和标签，会白占约 150 字/卡。
+
+        Args:
+            content: 向量库中的原始文档字符串
+
+        Returns:
+            只保留正文（若不符合该格式则原样返回）
+        """
+        marker = "\n内容: "
+        idx = content.find(marker)
+        if not content.startswith("标题: ") or idx < 0:
+            return content
+
+        body = content[idx + len(marker):]
+
+        # 去掉末尾的「标签: …」行
+        tag_marker = "\n标签: "
+        tag_idx = body.rfind(tag_marker)
+        if tag_idx >= 0:
+            body = body[:tag_idx]
+
+        return body.strip()
 
     def _build_conversation_history(
         self,

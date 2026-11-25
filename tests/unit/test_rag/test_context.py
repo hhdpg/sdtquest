@@ -75,6 +75,69 @@ class TestContextAssembler:
         assert len(prompt) > 0
 
 
+class TestContextAssemblerDedup:
+    """向量库文档头去重测试
+
+    向量库存的 document 是 to_document_string() 产物，已含
+    「标题/页面/路径/内容/标签」。组装 Prompt 若再拼一遍，每张卡白占约 150 字。
+    """
+
+    def test_strip_header_removes_title_and_tags(self):
+        """应剥掉标题/页面/路径/标签，只留正文"""
+        raw = (
+            "标题: 工单有哪些类型？\n"
+            "页面: 顺店通\n"
+            "路径: 工单管理 → 工单操作台\n"
+            "内容: 转寄、退回、破损、遗失\n"
+            "标签: 工单类型, 自动工单"
+        )
+        body = ContextAssembler._strip_document_header(raw)
+        assert body == "转寄、退回、破损、遗失"
+
+    def test_strip_header_keeps_plain_content(self):
+        """非该格式的纯正文应原样返回"""
+        assert ContextAssembler._strip_document_header("普通正文") == "普通正文"
+
+    def test_titles_not_duplicated_in_context(self):
+        """组装后的上下文里，标题只出现一次"""
+        raw = "标题: 唯一标题XYZ\n页面: 模块A\n路径: 菜单 → 子菜单\n内容: 正文内容\n标签: t1"
+        doc = make_doc(title="唯一标题XYZ", content=raw)
+        context = ContextAssembler()._build_knowledge_context([doc])
+        assert context.count("唯一标题XYZ") == 1
+
+
+class TestContextAssemblerBudget:
+    """上下文长度预算按 provider 区分测试"""
+
+    class _FakeManager:
+        def __init__(self, provider):
+            self.current = provider
+
+    def test_glm_budget_is_larger(self):
+        """GLM 窗口大，单篇上限应高于本地模型"""
+        from src.config import settings
+
+        assert settings.RAG_MAX_DOC_CHARS_GLM > settings.RAG_MAX_DOC_CHARS
+        assert settings.RAG_MAX_CONTEXT_CHARS_GLM > settings.RAG_MAX_CONTEXT_CHARS
+
+    def test_long_doc_kept_under_glm(self):
+        """超过本地单篇上限的内容，在 GLM 下不应被截断"""
+        from src.config import settings
+
+        long_body = "正" * (settings.RAG_MAX_DOC_CHARS + 500)
+        doc = make_doc(content=long_body)
+
+        glm_ctx = ContextAssembler(
+            provider_manager=self._FakeManager("glm")
+        )._build_knowledge_context([doc])
+        local_ctx = ContextAssembler(
+            provider_manager=self._FakeManager("local")
+        )._build_knowledge_context([doc])
+
+        assert "已截断" not in glm_ctx
+        assert "已截断" in local_ctx
+
+
 class TestContextAssemblerSources:
     """引用来源格式化测试"""
 

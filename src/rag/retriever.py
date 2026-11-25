@@ -116,7 +116,8 @@ class HybridRetriever:
             threshold = threshold if threshold is not None else self._get_threshold_by_category(category)
         else:
             top_k = top_k or settings.RAG_TOP_K
-            threshold = threshold if threshold is not None else settings.RAG_THRESHOLD_FLEXIBLE
+            if threshold is None:
+                threshold = self._get_threshold_by_category(QuestionCategory.GENERAL)
 
         logger.debug(
             "开始混合检索 | query_len={} | top_k={} | threshold={} | category={}",
@@ -481,15 +482,51 @@ class HybridRetriever:
             return 5
 
     def _get_threshold_by_category(self, category: QuestionCategory) -> float:
-        """根据问题类型获取余弦相似度阈值"""
+        """
+        根据问题类型获取余弦相似度阈值。
+
+        两个 provider 的 embedding 分布不同，阈值必须分别取：
+        GLM embedding-3 整体相似度更高，沿用 bge-m3 的阈值会误召回。
+
+        Args:
+            category: 问题分类
+
+        Returns:
+            当前 provider 下该分类的阈值
+        """
+        glm = self._using_glm()
+
         if category == QuestionCategory.OPERATION_GUIDE:
-            return settings.RAG_THRESHOLD_STANDARD
+            return (
+                settings.RAG_THRESHOLD_GLM_STANDARD if glm
+                else settings.RAG_THRESHOLD_STANDARD
+            )
         elif category == QuestionCategory.PROCESS_INQUIRY:
-            return settings.RAG_THRESHOLD_PROCESS
+            return (
+                settings.RAG_THRESHOLD_GLM_PROCESS if glm
+                else settings.RAG_THRESHOLD_PROCESS
+            )
         elif category == QuestionCategory.ANOMALY_TROUBLESHOOT:
-            return settings.RAG_THRESHOLD_FLEXIBLE
-        else:
-            return settings.RAG_THRESHOLD_GENERAL
+            return (
+                settings.RAG_THRESHOLD_GLM_FLEXIBLE if glm
+                else settings.RAG_THRESHOLD_FLEXIBLE
+            )
+        return (
+            settings.RAG_THRESHOLD_GLM_GENERAL if glm
+            else settings.RAG_THRESHOLD_GENERAL
+        )
+
+    def _using_glm(self) -> bool:
+        """
+        当前检索是否走 GLM embedding。
+
+        Returns:
+            True 表示当前 provider 为 glm
+        """
+        return (
+            self.provider_manager is not None
+            and self.provider_manager.current == "glm"
+        )
 
 
 class SimpleRetriever:

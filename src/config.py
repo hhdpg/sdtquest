@@ -59,16 +59,26 @@ class Settings(BaseSettings):
     # 本地 bge-m3 用 CHROMA_COLLECTION，GLM embedding-3 用以下集合。
     CHROMA_COLLECTION_GLM: str = "knowledge_base_glm"
     RAG_TOP_K: int = 5
-    # 阈值均为「余弦相似度」(0-1)，基于 bge-m3 实测校准:
-    # 相关问句 top-1 落在 0.51~0.65，无关问句 top-1 落在 0.31~0.37。
+    # 阈值均为「余弦相似度」(0-1)，两个 provider 的向量分布不同，必须分别标定。
+    # ── 本地 bge-m3（2026-11 实测）：相关问句 top-1 约 0.51~0.65，无关 0.31~0.37 ──
     RAG_THRESHOLD_STANDARD: float = 0.52    # 标准操作类：要求高精度
     RAG_THRESHOLD_PROCESS: float = 0.48      # 流程咨询类
     RAG_THRESHOLD_FLEXIBLE: float = 0.45     # 异常排查类：多召回一些候选
     RAG_THRESHOLD_GENERAL: float = 0.45      # 未分类问题
+    # ── 远程 GLM embedding-3（2026-11 实测）：相关 top-1 约 0.59~0.76，无关 0.35~0.58 ──
+    # GLM 整体相似度比 bge-m3 高，沿用 0.52 会误召回（如「打印机卡纸」命中打印设置卡）。
+    # 取 0.58：挡住绝大多数无关问题，跨域近似问题（打印机卡纸 0.583）由提示词兜底拒答。
+    RAG_THRESHOLD_GLM_STANDARD: float = 0.58
+    RAG_THRESHOLD_GLM_PROCESS: float = 0.56
+    RAG_THRESHOLD_GLM_FLEXIBLE: float = 0.54
+    RAG_THRESHOLD_GLM_GENERAL: float = 0.54
     RAG_SPARSE_MAX_KEYWORDS: int = 8         # 关键词检索最多使用的 n-gram 数
-    # 上下文长度控制（字符数）：避免 prompt 超出模型上下文窗口导致回答被截断
+    # 上下文长度控制（字符数）：默认值面向本地 9B 的 8k 窗口。
+    # GLM 窗口远大于此，用 *_GLM 放宽，避免长卡片被截断丢要点。
     RAG_MAX_DOC_CHARS: int = 1500            # 单篇知识文档最大字符数
     RAG_MAX_CONTEXT_CHARS: int = 6000        # 所有知识文档的合计上限
+    RAG_MAX_DOC_CHARS_GLM: int = 3000
+    RAG_MAX_CONTEXT_CHARS_GLM: int = 12000
 
     # ── 生成参数 ──
     LLM_TEMPERATURE_STANDARD: float = 0.3

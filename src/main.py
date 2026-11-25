@@ -156,7 +156,13 @@ def create_services(infra: dict) -> dict:
     from src.rag.retriever import HybridRetriever
 
     retriever = HybridRetriever(provider_manager=provider_manager)
-    rag_pipeline = RAGPipeline(retriever=retriever)
+    # ContextAssembler 也需要 manager：GLM 窗口大，上下文长度预算不同
+    from src.rag.context import ContextAssembler
+
+    rag_pipeline = RAGPipeline(
+        retriever=retriever,
+        context_assembler=ContextAssembler(provider_manager=provider_manager),
+    )
     logger.info("RAG 管道初始化完成")
 
     # ── 问题分类器 ──
