@@ -112,12 +112,13 @@ class ContextAssembler:
         parts = []
         used = 0
         for i, doc in enumerate(docs, 1):
-            content = self._strip_document_header(doc.content)
+            raw = doc.content
+            content = self._strip_document_header(raw)
             if len(content) > max_doc_chars:
                 content = content[:max_doc_chars] + "\n...(内容过长已截断)"
                 logger.debug(
                     "知识文档超长已截断 | title={} | 原始长度={}",
-                    doc.title, len(doc.content),
+                    doc.title, len(raw),
                 )
 
             doc_parts = [f"【文档{i}】{doc.title}"]
@@ -126,6 +127,14 @@ class ContextAssembler:
             # 前端路由如 /adiBus/order 业务人员看不懂，且会被模型照抄进答案）
             if doc.page_name:
                 doc_parts.append(f"所属模块: {doc.page_name}")
+
+            # 菜单入口：知识卡片的 page_path 是中文菜单层级
+            #（如「订单管理 → 订单列表」），是用户唯一能照做的定位信息，
+            # 必须保留。但代码解析来的知识 page_path 是 URL / 前端路由，
+            # 业务人员看不懂，过滤掉。
+            entry_path = self._usable_entry_path(doc.page_path)
+            if entry_path:
+                doc_parts.append(f"入口: {entry_path}")
 
             # 添加内容
             doc_parts.append(f"内容: {content}")
@@ -148,6 +157,30 @@ class ContextAssembler:
             used += len(block)
 
         return "\n\n".join(parts)
+
+    @staticmethod
+    def _usable_entry_path(page_path: str | None) -> str:
+        """
+        判断 page_path 能否给业务人员看。
+
+        知识卡片填的是中文菜单层级（如「订单管理 → 新建订单」），可以直接展示；
+        代码解析来的知识填的是 URL 或前端路由（如 https://… /adiBus/order），
+        业务人员看不懂，也不该出现在答案里。
+
+        Args:
+            page_path: 知识条目的 page_path
+
+        Returns:
+            可展示的菜单路径；不可用时返回空字符串
+        """
+        if not page_path:
+            return ""
+
+        value = page_path.strip()
+        if not value or value.startswith(("/", "http://", "https://")):
+            return ""
+
+        return value
 
     @staticmethod
     def _strip_document_header(content: str) -> str:

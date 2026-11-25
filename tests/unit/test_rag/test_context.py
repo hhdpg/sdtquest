@@ -106,6 +106,55 @@ class TestContextAssemblerDedup:
         assert context.count("唯一标题XYZ") == 1
 
 
+class TestContextAssemblerEntryPath:
+    """菜单入口路径测试
+
+    知识卡片的 page_path 是中文菜单层级，是用户唯一能照做的定位；
+    代码解析知识的 page_path 是 URL / 前端路由，必须过滤。
+    """
+
+    def test_chinese_menu_path_kept(self):
+        """中文菜单路径应进入上下文"""
+        doc = KnowledgeItem(
+            id="k1", type=KnowledgeType.MANUAL, title="导出POD",
+            content="标题: 导出POD\n页面: 订单\n路径: 订单管理 → 订单列表\n内容: 勾选后点导出",
+            page_path="订单管理 → 订单列表",
+        )
+        context = ContextAssembler()._build_knowledge_context([doc])
+        assert "订单管理 → 订单列表" in context
+
+    def test_url_path_filtered(self):
+        """URL 形式的路径不应出现（业务人员看不懂）"""
+        doc = KnowledgeItem(
+            id="k1", type=KnowledgeType.MANUAL, title="某页面",
+            content="内容",
+            page_path="https://talent.sf-express.com/static-portal/#/",
+        )
+        context = ContextAssembler()._build_knowledge_context([doc])
+        assert "talent.sf-express.com" not in context
+
+    def test_route_path_filtered(self):
+        """前端路由（以 / 开头）不应出现"""
+        doc = KnowledgeItem(
+            id="k1", type=KnowledgeType.MANUAL, title="某页面",
+            content="内容",
+            page_path="/adiBus/order",
+        )
+        context = ContextAssembler()._build_knowledge_context([doc])
+        assert "/adiBus/order" not in context
+
+    def test_entry_path_survives_header_strip(self):
+        """剥掉文档头后，page_path 仍要单独保留"""
+        doc = KnowledgeItem(
+            id="k1", type=KnowledgeType.MANUAL, title="状态",
+            content="标题: 状态\n页面: 订单\n路径: 订单管理 → 订单列表\n内容: 导入→已完成",
+            page_path="订单管理 → 订单列表",
+        )
+        context = ContextAssembler()._build_knowledge_context([doc])
+        assert "入口: 订单管理 → 订单列表" in context
+        assert context.count("订单管理 → 订单列表") == 1
+
+
 class TestContextAssemblerBudget:
     """上下文长度预算按 provider 区分测试"""
 
