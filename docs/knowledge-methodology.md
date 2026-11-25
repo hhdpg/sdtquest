@@ -1,10 +1,13 @@
 # 知识库构建方法论：从原始资料到可检索卡片
 
-> 版本：v1.2　｜　日期：2026-11-24　｜　依据：79 张实测卡片
+> 版本：v1.3　｜　日期：2026-11-25　｜　依据：79 张实测卡片 + GLM/本地双模型对照
 >
 > 本文是一份**可复用的操作手册**：任何新的原始资料（Word 手册、钉钉文档、
 > 后端规则文档、线上日志）进入系统时，按本文的步骤处理即可产出合格卡片。
 > 所有参数与阈值均来自本项目实测，不是理论推导。
+>
+> v1.3 新增第 13 章：接入 GLM 后，向量化字段、切分与检索策略的调整依据，
+> 以及用 `eval_generation.py` 做生成层回归的操作步骤与判定标准。
 
 ---
 
@@ -922,3 +925,400 @@ items = self._rerank_with_rules(query, items, ...)
 | 向量化 79 张卡 | 约 60 秒 |
 | 单次检索（含重排） | 约 200ms |
 | 完整端到端测试（82 个问题） | 约 2 分钟 |
+
+---
+
+## 13. 知识库改造方案（接入 GLM 后）
+
+> 本章是 v1.3 增补。前 12 章按本地 9B 模型 + bge-m3 设计，
+> 本章记录接入 GLM 后发现的短板、改法与验证标准。
+> 结论先行：**卡片结构与切分不用重做**，需要改的是「什么进入向量」
+> 「哪些字段该进 Prompt」和「按 provider 分别标定的检索参数」。
+
+### 13.1 为什么不是「重做一套」
+
+改造前的基线是健康的，这决定了改的是局部而非整体：
+
+| 检查项 | 结果 |
+|---|---|
+| 结构校验 `validate_cards.py` | 79/79 通过 |
+| 正文长度 | 164–497 字，中位 372（全部在 200–500 设计区间） |
+| 字段填充率 | 除 `permissions`(18/79) 外均接近 100% |
+| `related` 断链 | 0 处 |
+| 关键词召回 `eval_cards.py` | 100%（82/82） |
+
+问题出在三处，都**不在卡片内容本身**：
+
+1. 向量化时只读了 `one_liner + body`，`title` 和 `anchors` 没进向量
+2. 卡片正文里混着代码枚举，模型会原样抄进答案
+3. 阈值与提示词按 9B 模型标定，换 GLM 后不适用
+
+### 13.2 为什么需要「生成层」回归
+
+这是本次改造最重要的认知：**前三层测试都测不出答案质量问题**。
+
+```
+① 结构校验    validate_cards.py   卡片格式对不对
+② 关键词回归  eval_cards.py       卡片能不能被关键词命中
+③ 检索回归    test_e2e.py         向量召回对不对
+④ 生成回归    eval_generation.py  答案讲得全不全  ← v1.3 新增
+```
+
+改造前的真实故障：检索完全正确、卡片内容完整，但模型回答
+「工单有哪些类型」时只回「进入工单操作台查看工单类型一览」，
+要点覆盖率 **72%**。前三层全部绿灯，只有生成层能发现。
+补上提示词规则后升到 **97%**，最终加清洗后到 **100%**。
+
+> 判定标准：**只要改动涉及 Prompt、检索参数或卡片正文，必须跑第 ④ 层。**
+
+---
+
+### 13.3 字段调整
+
+#### 13.3.1 title 与 anchors 必须进入向量（P0）
+
+**改造前**：`scripts/build_index.py` 向量化 `one_liner + body`。
+
+```python
+# ❌ 改造前：标题与锚点没进向量
+embeddings = await embed.embed_documents([it.content for it in items])
+```
+
+**问题**：`one_liner` 与 `body` 写的是「答案」，`title` 与 `anchors`
+写的是「用户会怎么问」。用户换个说法就召不回。
+
+**实测**（GLM embedding-3，20 条真实问法）：
+
+| 向量化文本 | top1 命中 |
+|---|---|
+| `one_liner + body` | 16/20 |
+| `+ title + anchors` | **18/20** |
+
+**改法**：向量化文本与入库 document 分离，统一由
+`scripts/card_loader.py::build_embedding_text()` 生成：
+
+```python
+def build_embedding_text(card: dict) -> str:
+    parts = [title, one_liner, body, "关键词：" + "、".join(anchors)]
+    return "\n\n".join(p for p in parts if p)
+```
+
+**为什么不重复**：`title` 不在 `body` 里重复出现（已校验），
+`ContextAssembler` 输出 Prompt 时标题单独一行，不会二次叠加。
+
+**关键约束**：建库与评估**必须共用同一个函数**，否则会出现
+「评测向量化 A、线上向量化 B」，测出来的分数不代表线上效果。
+这是抽出 `card_loader.py` 的原因——改造前 `build_index.py` 与
+`test_e2e.py` 各写了一份转换逻辑。
+
+#### 13.3.2 卡片正文清除代码枚举（P1）
+
+**问题**：以代码为来源的卡片，正文里写着后端枚举常量，
+模型会原样抄进答案，业务人员看不懂。
+
+```
+· 导入（IMPORT）
+· 已下单（ALREADY_CREATE_ORDER）
+同一客户订单号（customerOrderNo）已存在
+```
+
+**改法**：正文只保留业务语言，代码标识移到 `source_ref` 或删除。
+
+| 卡片 | 移除内容 |
+|---|---|
+| `order-state-machine` | `IMPORT` `ALREADY_CREATE_ORDER` 等 9 个状态常量 |
+| `order-trouble-duplicate` | `customerOrderNo` |
+| `sdt-task-month-paycode` | `monthlyCardUuid`、`成本类型=7` |
+| `order-glossary-value-added` | `IN31` `IN153` |
+| `order-rule-cancel-delete` | `AGENT` |
+
+**什么该保留**：业务方本来就在用的英文缩写，**不是泄漏**：
+
+```
+保留：WMS  POD  O2O  API  SKU  HRMI  KYSY（跨越速运）SQDP（商圈店配）
+移除：蛇形枚举 IMPORT、驼峰字段 customerOrderNo、前端路由 /adiBus/order
+```
+
+判定规则写在 `eval_generation.py::find_leaks()`，由单元测试锁住
+（`tests/unit/test_scripts/test_eval_generation.py`），
+改动检测规则时会立刻暴露误报/漏报。
+
+#### 13.3.3 未被使用的字段
+
+以下字段填了但运行时完全不读，需要决策：
+
+| 字段 | 填充率 | 现状 | 建议 |
+|---|---|---|---|
+| `permissions` | 18/79 | 检索无任何过滤 | 要么按提问人角色过滤，要么删除 |
+| `roles` | 79/79 | 同上 | 同上 |
+| `expires_at` | 77/79 | 无任何代码检查 | 加 CI 检查，过期卡告警 |
+| `related` | 79/79 | 仅人工参考，不进 Prompt | 可考虑检索后关联扩展 |
+
+> 字段存在但不生效，比字段不存在更危险——维护者会误以为它起作用了。
+
+---
+
+### 13.4 切分策略：维持「一卡一向量」
+
+**结论：不要按小节切分。** 实测数据：
+
+| 策略 | 向量数 | top1 命中 | 无关问题最高相似度 |
+|---|---|---|---|
+| 一卡一向量（现状） | 79 | 19/21 | 0.594 |
+| 按`【小节】`切分 | 400 | 19/21 | 0.601 |
+
+命中率不变，无关问题相似度反而上浮（更容易误召回），且检索复杂度大增。
+
+**保持现有约束**：单卡正文 200–500 字、一卡只答一个问题。
+语义浓度已经被卡片设计保证了，再切只会碎片化。
+
+---
+
+### 13.5 检索策略
+
+#### 13.5.1 阈值必须按 provider 分别标定（P0）
+
+两个 embedding 模型的相似度分布不同，共用一个阈值必然有一边不对。
+
+**实测分布**：
+
+| 模型 | 相关问句 top-1 | 无关问句 top-1 |
+|---|---|---|
+| 本地 bge-m3 | 0.51–0.65 | 0.31–0.37 |
+| GLM embedding-3 | 0.59–0.76 | 0.35–0.58 |
+
+GLM 整体偏高，沿用 0.52 会把「打印机卡纸怎么办」召回到打印设置卡。
+
+**配置**（`src/config.py`）：
+
+```python
+# bge-m3
+RAG_THRESHOLD_STANDARD = 0.52
+RAG_THRESHOLD_PROCESS  = 0.48
+RAG_THRESHOLD_FLEXIBLE = 0.45
+RAG_THRESHOLD_GENERAL  = 0.45
+
+# GLM embedding-3（整体上抬）
+RAG_THRESHOLD_GLM_STANDARD = 0.58
+RAG_THRESHOLD_GLM_PROCESS  = 0.56
+RAG_THRESHOLD_GLM_FLEXIBLE = 0.54
+RAG_THRESHOLD_GLM_GENERAL  = 0.54
+```
+
+**选点依据**：GLM 上 0.58 时相关问句 20/20 全召回、无关问题 0/20 误召回；
+0.60 开始掉召回（17/20）。
+
+**上下文预算同样分开**：GLM 窗口远大于 9B，单卡 1500→3000、
+总量 6000→12000（`RAG_MAX_DOC_CHARS_GLM` / `RAG_MAX_CONTEXT_CHARS_GLM`）。
+
+#### 13.5.2 向量层不可分的边界问题
+
+有些问题在向量空间里**就是分不开**，调阈值会连真问题一起挡掉：
+
+```
+「打印机卡纸怎么办」0.583    ← 假问题（知识库没有）
+「打印机连不上」  0.559    ← 真问题（有面单打印卡）
+```
+
+**处理原则**：不调阈值。这类问题由两层兜底：
+
+1. 提示词明确要求「知识库讲的是别的事情时，也回答没有资料」
+2. 靠补卡解决——如果真的存在「打印机卡纸」相关操作，补一张卡
+
+#### 13.5.3 关键词重排阈值需随卡片数重标
+
+`config/retrieval.yaml` 的 `thresholds.keyword_score: 3.0` 是 25 张卡时
+标定的（79 张卡后验证仍有效）。**卡片数量变化后必须重跑
+`eval_cards.py` 重新标定**——分数随卡片总数上浮。
+
+#### 13.5.4 order-types 与 order-fields 的内容边界重划
+
+这两张卡内容边界重叠，是当前已知的检索歧义来源：
+
+**现状冲突**：
+
+| 问题 | 期望卡片 | 实际命中 |
+|---|---|---|
+| 下单类型有哪些区别 | order-glossary-order-types | order-glossary-order-fields |
+| 下单类型怎么选 | order-glossary-order-types | order-task-create |
+
+**根因**：`order-fields` 的正文第一段就写着「下单类型决定寄件场景」
+并列出四种类型，与 `order-types` 的职责重复；`anchors` 里也挂了
+`下单类型区别`、`异地代发`、`调拨下单`、`客户退货`。
+
+**重划方案**（按「一张卡只答一个问题」原则）：
+
+```yaml
+# order-glossary-order-types —— 只答「四种下单类型是什么、我该选哪个」
+title: 标准下单、异地代发、调拨下单、客户退货有什么区别？该用哪个？
+anchors: [下单类型, 标准下单, 异地代发, 调拨下单, 客户退货,
+          下单方式区别, 该用哪个下单类型, 下单类型怎么选]
+# 正文：四种类型的场景、地址规则、费用承担、选型口诀
+# 删除「批量下单」段（已由 order-task-batch-import 覆盖）
+
+# order-glossary-order-fields —— 只答「下单页那几个字段各是什么意思」
+title: 下单页的成本类型、计价类型、付款方式分别是什么意思？
+anchors: [成本类型是什么意思, 计价类型, 付款方式区别,
+          寄付到付, 月结卡号]
+# 正文：删掉【下单类型】整段（指向 order-types 卡：见「下单类型区别」卡）
+#       只保留 成本类型 / 计价类型 / 付款方式 / 月结卡号
+```
+
+**验证方式**：两张卡的 `anchors` 不允许出现对方 title 中的词。
+可用一次性脚本检查（见 13.6.4），确认后重建索引。
+
+> 注意：当前 `eval_generation.py` 用 `acceptable_cards` 把这两条标注为
+> 「内容重叠、命中任一都算对」。**重划完成后必须移除该豁免**，
+> 否则门禁会掩盖新的歧义。
+
+---
+
+### 13.6 用 GLM 跑生成层回归
+
+#### 13.6.1 前置条件
+
+```bash
+# 1. 确认 provider 与索引配套（GLM 用 knowledge_base_glm 集合）
+grep LLM_PROVIDER .env          # 应为 glm
+grep GLM_API_KEY .env           # 非空
+
+# 2. 改过卡片或向量化逻辑后，必须重建双索引
+uv run scripts/build_index.py --provider all
+```
+
+> 索引不重建 = 用旧向量测新卡片，结论无意义。这是最容易犯的错。
+
+#### 13.6.2 三条命令
+
+```bash
+# 结构校验：卡片格式、长度、related 连通性
+uv run scripts/validate_cards.py --dir data/cards
+
+# 生成层评测（打印每条用例明细 + 汇总指标）
+uv run scripts/eval_generation.py --provider glm
+
+# 双模型对照（防止只为 GLM 调参，把本地模型改坏）
+uv run scripts/eval_generation.py --compare
+
+# 作为门禁（不达标退出码 1，可接 CI）
+uv run scripts/eval_generation.py --provider glm --gate
+```
+
+#### 13.6.3 判定标准
+
+`--gate` 的门禁阈值定义在 `eval_generation.py` 顶部：
+
+```python
+GATE_KEY_FACT_RATE = 0.95   # 要点覆盖率 ≥ 95%
+GATE_REFUSAL_RATE  = 1.00   # 无答案问题必须 100% 拒答
+GATE_MAX_LEAKS     = 0      # 英文枚举/字段/路由泄漏必须为 0
+```
+
+四个指标的含义与排查方向：
+
+| 指标 | 基线 | 不达标时优先查 |
+|---|---|---|
+| **检索 top1 命中率** | 100% | 卡片 anchors 是否串味 / 阈值是否匹配当前 provider |
+| **要点覆盖率** | 100% | System Prompt 是否要求列全 / 卡片正文是否缺该事实 |
+| **拒答率** | 100% | 阈值是否过低（误召回）/ 提示词安全边界是否被改掉 |
+| **枚举泄漏** | 0 处 | 卡片正文是否残留代码常量 |
+
+**2026-11-25 实测基线**（79 张卡，20 条黄金集 + 10 条拒答）：
+
+| 指标 | local | glm |
+|---|---|---|
+| 检索 top1 命中 | 100% | 100% |
+| 要点覆盖 | 100% | 100% |
+| 拒答率 | 100% | 100% |
+| 枚举泄漏 | 0 处 | 0 处 |
+| 平均字数 | 160 | 142 |
+
+#### 13.6.4 维护黄金集
+
+黄金集在 `scripts/golden_cases.py`，每条用例：
+
+```python
+GoldenCase(
+    question="工单有哪些类型",          # 用户会怎么问
+    expected_card="sdt-glossary-ticket-types",
+    key_facts=("转寄", "退回", "破损", "遗失"),  # 答案必须出现的原文用词
+)
+```
+
+维护规则：
+
+- **`key_facts` 必须取自卡片正文原文**，不要改写成同义词，
+  否则模型用同义表述会被误判为缺失
+- 一个事实用 2–6 字、有区分度的词，别用「订单」这种泛词
+- 标准问法 + 口语化问法都要有
+- `acceptable_cards` 只用于**已确认的卡片设计重叠**，不要拿来放宽标准
+- 新增卡片后，至少补一条对应用例
+
+黄金集与卡片的一致性可一次性校验：
+
+```bash
+uv run python - <<'EOF'
+import sys; sys.path.insert(0, '.')
+from pathlib import Path
+from scripts.card_loader import load_cards
+from scripts.golden_cases import GOLDEN_CASES
+
+cards = {c["card_id"]: c for c in load_cards(Path("data/cards"))}
+for gc in GOLDEN_CASES:
+    c = cards.get(gc.expected_card)
+    if not c:
+        print(f"❌ 卡不存在: {gc.expected_card}")
+        continue
+    blob = (c.get("title", "") + c.get("one_liner", "")
+            + c.get("body", "") + " ".join(map(str, c.get("anchors") or [])))
+    miss = [f for f in gc.key_facts if f not in blob]
+    if miss:
+        print(f"⚠️  {gc.question} 事实不在卡中: {miss}")
+EOF
+```
+
+#### 13.6.5 完整回归清单
+
+改动卡片 / Prompt / 检索参数后，按顺序跑：
+
+```
+□ uv run scripts/build_index.py --provider all        重建双索引
+□ uv run scripts/validate_cards.py --dir data/cards   79/79 通过
+□ uv run scripts/eval_cards.py                        本域召回 100%
+□ uv run scripts/eval_generation.py --provider glm --gate
+    ├─ 要点覆盖 ≥ 95%
+    ├─ 拒答率 100%
+    ├─ 枚举泄漏 0
+    └─ 检索 top1 ≥ 95%
+□ uv run scripts/eval_generation.py --compare         本地模型未被改坏
+□ uv run pytest tests -q                              单元测试全通过
+□ 人工抽检 5 个回答，确认业务语言正确
+```
+
+#### 13.6.6 改造过程暴露的三个教训
+
+**教训一：工具先于结论**
+
+枚举泄漏 19 处是门禁第一次运行就抓到的，不是人工看出来的。
+**没有度量就没有改造**——先建评测，再改内容。
+
+**教训二：检测规则本身需要测试**
+
+第一版泄漏检测器把 `WMS`、`HRMI`、`KYSY` 等业务术语误报成泄漏。
+加了单元测试（`test_eval_generation.py`）后，改规则会立刻暴露误报。
+
+**教训三：A/B 结论要用真实链路验证**
+
+清理 `order-fields` 的锚点后，纯向量 top-1 命中反而从 5/8 降到 4/8。
+用生产检索器复测才发现：九条规则里的「卡型意图一致性」会降权 trouble 卡，
+纯向量测试绕过了它。**任何检索改动都要经 `HybridRetriever` 验证，
+不能只测 embedding。**
+
+---
+
+## 14. 更新记录（补充）
+
+| 版本 | 日期 | 更新内容 |
+|---|---|---|
+| v1.2 | 2026-11-24 | 79 张卡基线、九条检索规则、端到端验证 |
+| v1.3 | 2026-11-25 | 第 13 章：title/anchors 入向量、枚举清洗、按 provider 标定阈值、生成层回归 |

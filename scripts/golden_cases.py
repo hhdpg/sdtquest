@@ -31,10 +31,6 @@ class GoldenCase:
     # 只用于已确认的卡片设计重叠，不要拿来放宽检索标准。
     acceptable_cards: tuple[str, ...] = ()
 
-    def matches(self, card_id: str) -> bool:
-        """命中的卡片是否被视为正确。"""
-        return card_id == self.expected_card or card_id in self.acceptable_cards
-
 
 # ── 有答案的问题：必须命中卡片，且答案含全部关键事实 ──
 GOLDEN_CASES: tuple[GoldenCase, ...] = (
