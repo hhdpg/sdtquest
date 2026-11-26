@@ -523,6 +523,30 @@ v2 有付费校验：需要开通「预充值账户」（服务类型 12），�
 | 12 | 运单号校验 Service 返回 null 时 Controller NPE | `BspValidateWayBillNoController` | 异常信息不友好 |
 | 13 | 两个错误码同为 `US_100003`（`ILLEGAL_REQUEST` / `PARMAS_HAS_ERROR`） | `ErrorCode.java` | 客户无法区分 |
 | 14 | `TestController` 暴露在生产代码 | `open-server` | 上线前需确认网关拦截 |
+| 15 | `us_route_push_config` 存在 app_id ≠ org_id 的脏数据 | SIT 表 id=5、id=7 | 推送时用错误 app_id 查不到密钥，推送必然失败 |
+
+### 12.1 待修数据：路由推送配置 app_id 与 org_id 不一致
+
+**设计口径**：`us_route_push_config.app_id` 应当等于 `org_id`（组织 ID）。
+代码用 `app_id` 去 `us_open_config` 查 SM2 公钥，两者不一致就查不到，推送直接失败。
+
+SIT 环境实测 29 条配置中有 2 条不符合：
+
+| id | org_id | app_id（错误值） | 组织名称 | status |
+|---|---|---|---|---|
+| 5 | 142928 | `VpCND4rg` | 中国联合网络通信有限公司甘肃省分公司 | 1 |
+| 7 | 142941 | `93f10ac621e6451480634e207` | 郑州丹尼斯百货有限公司 | 1 |
+
+两条的 `app_id` 在 `us_open_config` 中均不存在，对应组织（142928 / 142941）的配置是有的。
+修复方式：把这两行的 `app_id` 改回与 `org_id` 一致。
+
+**排查 SQL**（只读，确认是否还有类似数据）：
+
+```sql
+select id, org_id, app_id, org_name, status
+from us_route_push_config
+where app_id <> cast(org_id as char);
+```
 
 ---
 
