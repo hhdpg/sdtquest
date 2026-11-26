@@ -36,6 +36,8 @@ env/
 # 环境变量
 .env
 .env.local
+.env.db
+.env.db.local
 
 # 数据目录
 data/chroma_db/
