@@ -1,0 +1,53 @@
+card_id: sdt-api-config-exclusive
+type: rule
+title: 哪些客户开了接口能力？怎么查某个组织有没有开通？
+one_liner: 幂等和地址解析靠应用配置白名单，推送靠数据库表或地址映射，都要单独申请。
+body: |
+  【四类能力，三种存放位置】
+
+  **1. 下单幂等（应用配置白名单）**
+  只有名单里的组织才有按客户订单号幂等的能力，
+  不在名单里重复提交一定重复下单。
+  名单是逗号分隔的组织 ID 列表，改完需刷新配置才生效。
+
+  **2. 地址解析（应用配置白名单）**
+  同样是一个组织 ID 列表。
+  不在名单里调地址解析，直接报「此应用不允许访问」。
+
+  **3. 推送类（数据库配置表 / 地址映射）**
+  · 路由推送：每个组织一行，含地址、密钥、产品标识、推送方式
+  · 清单运费推送：每个组织一行，含地址、密钥、启用状态
+  · 店铺经纬度推送：应用配置里的「组织 → 接收地址」映射
+
+  都要单独配，没配就不推。
+
+  **4. 箱号唯一性校验（应用配置开关）**
+  总开关控制按组织查箱号，另有天数窗口控制校验范围，都配在应用配置里。
+
+  【怎么查某个组织有没有开通】
+  按能力分别查：
+  · 幂等 / 地址解析 → 查应用配置里的对应白名单有没有这个组织 ID
+  · 路由推送 / 运费推送 → 查数据库配置表有没有这个组织的记录、状态是否启用
+  · 店铺推送 → 查应用配置的地址映射里有没有这个组织
+  · 箱号 → 查总开关是否开启
+
+  【给客户的标准答复】
+  先问「你的组织 ID 是多少」，拿到后按上面四类逐项确认。
+
+  【一个提醒】
+  白名单类配置改完不一定立刻生效，有缓存刷新周期。
+  刚开通就测试可能还是老状态，等几分钟再试。
+anchors: [哪些客户开通了, 怎么查组织开通, 幂等白名单查询, 地址解析白名单, 推送配置查询, 组织ID查询, 能力开通查询]
+module: 顺店通开放接口
+entry_path: ""
+roles: [客户技术对接人, 实施人员, 二线支持]
+permissions: []
+source_ref:
+  - "Nacos SIT hd-united-store-openserver.yaml: idempotent.organizationIds（4 个）/ gis.appids（4 个）"
+  - "Nacos SIT hd-united-store-mqconsumer.yaml: maxmara.oneOrgIds / shopIdPush.customerUrls"
+  - "Nacos SIT hd-united-store-manager.yaml: shopIdPush.oneOrgIds"
+  - eps-store-core-united-store-be/united-store-common/src/main/java/com/sf/united/store/common/cache/FeePushOrgConfigCache.java
+owner: "01415465"
+verified_at: 2026-11-26
+expires_at: 2027-05-26
+related: [sdt-api-config-where, sdt-api-idempotent-scope, sdt-api-address-identify]

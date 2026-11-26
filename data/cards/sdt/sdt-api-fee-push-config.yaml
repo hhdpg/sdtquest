@@ -1,48 +1,48 @@
 card_id: sdt-api-fee-push-config
 type: rule
 title: 清单运费推送要配什么？为什么有的客户能收到我们收不到？
-one_liner: 按一级组织配：接收地址、密钥、启用状态，三样齐全才推。
+one_liner: 数据库里按一级组织配三样：接收地址、密钥、启用状态，缺一就不推。
 body: |
-  【按一级组织配置】
-  运费推送不是全局开关，是**逐个一级组织**配置的。
+  【按一级组织配置，一个组织一行】
+  运费推送不是全局开关，是逐个一级组织配的。
   所以「别家能收到我们不能」很常见——就是没给你配。
+
+  **配置存在数据库表里，不在应用配置里。**
 
   【三样必须齐全】
 
   **1. 接收地址**
-  你的 URL。没配不推。
+  你的 URL。空着不推。
 
   **2. 密钥**
-  用于生成推送签名。你那边要用同一个值验签。
+  用于生成推送签名，你那边要用同一个值验签。
 
   **3. 启用状态**
-  必须显式启用。配了地址但没启用，一样不推。
+  必须显式启用。配了地址但停用，一样不推。
 
-  **任意一项缺失都不推，而且不会报错**，只是静默跳过。
+  **任意一项缺失都不推，且不报错**，只打一行「组织未配置或已停用」。
 
-  【推送的应用 ID 用什么】
+  【应用 ID 用什么】
   用的是**你的一级组织 ID**，不是另一个接口应用 ID。
-  所以验签时要用组织 ID 作为应用 ID。
+  验签时用它作为应用 ID。
 
-  【和「订单组织」的关系】
-  推送是按订单找到所属一级组织，再用该组织的配置推。
-  如果订单下在了 A 组织、但配置配在 B 组织，就推不出去。
-
-  所以多组织的客户一定要确认订单实际归属哪个组织。
+  【和订单组织的关系】
+  推送按订单找到所属一级组织，再用该组织的配置推。
+  订单下在 A 组织、配置配在 B 组织，就推不出去。
 
   【日志怎么查】
-  系统有两级：一级消费把顺丰数据落库，二级消费真正推给你。
-  一级有记录、二级没有 → 配置问题；一级也没有 → 顺丰侧还没推数据过来。
+  系统两级：一级消费把顺丰数据落库，二级消费真正推给你。
+  一级有记录、二级没有 → 配置问题；一级也没有 → 顺丰侧还没推数据。
 
   【推了但你没收到】
-  检查点从上游到下游：
-  配置 → 签名 → 你的地址可达 → 你的响应是 200。
-  400 会被判定为业务拒绝，不再重试。
+  从上游到下游逐个检查：
+  配置 → 签名 → 地址可达 → 你的响应是 200。
+  返回 400 会被判为业务拒绝，不再重试。
 
-  【和路由推送的区别】
-  路由推送配的是五样（地址、应用 ID、密钥、产品标识、推送方式）；
-  运费推送只配三样（地址、密钥、启用）。
-  两种配置是分开的，不要混。
+  【一个遗留项要注意】
+  应用配置里可能还留着早期的单客户推送参数，
+  那是硬编码时代的历史配置，**代码已经不读了**。
+  现在只看数据库表。别对着旧配置排查。
 anchors: [清单运费推送配置, 运费推送为什么收不到, 运费推送配置, 运费推送组织, 运费推送启用, fee push配置]
 module: 顺店通开放接口
 entry_path: ""
@@ -50,9 +50,9 @@ roles: [客户技术对接人, 实施人员, 财务]
 permissions: []
 source_ref:
   - docs/openapi-business-logic.md#10.1 清单运费推送
-  - docs/notes/C-o2o-city-callback.md#51 清单运费推送
-  - eps-store-core-united-store-be/knowledge/database/tables.md#us_fee_push_org_config
+  - eps-store-core-united-store-be/united-store-mq-consumer/src/main/java/com/sf/united/store/consumer/kafka/listener/sfkafka/WaybillsFeePushSfKafkaListener.java#L102
+  - eps-store-core-united-store-be/united-store-common/src/main/java/com/sf/united/store/common/cache/FeePushOrgConfigCache.java
 owner: "01415465"
-verified_at: 2026-11-25
-expires_at: 2027-05-25
+verified_at: 2026-11-26
+expires_at: 2027-05-26
 related: [sdt-api-fee-push-trouble, sdt-api-config-where, sdt-api-route-push-config]

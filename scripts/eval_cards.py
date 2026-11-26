@@ -159,7 +159,7 @@ CASES: dict[str, str] = {
     "箱号有什么规则": "sdt-api-boxno-rules",
     "接口下单箱号重复报错": "sdt-api-boxno-rules",
     "接口传月结卡报未验证": "sdt-api-monthly-card-check",
-    "超预算下单会被拦吗": "sdt-api-freight-budget-block",
+    "接口超预算会返回什么": "sdt-api-freight-budget-block",
     "统一下单几个接口区别": "sdt-api-order-variant-diff",
     "标准下单和店配下单区别": "sdt-api-order-variant-diff",
     "子单号怎么申请": "sdt-api-sub-order-apply",
@@ -206,6 +206,8 @@ CASES: dict[str, str] = {
     "开放接口对接需要配置哪些": "sdt-api-config-where",
     "路由推送要配哪几项": "sdt-api-route-push-config",
     "运费推送要配什么": "sdt-api-fee-push-config",
+    "哪些客户开通了接口能力": "sdt-api-config-exclusive",
+    "怎么查组织有没有开通": "sdt-api-config-exclusive",
 }
 
 
