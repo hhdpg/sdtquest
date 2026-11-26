@@ -327,7 +327,7 @@ class TestBotHandler:
     # ====================================================================
 
     def test_format_answer_with_sources(self, handler: BotHandler) -> None:
-        """测试带引用来源的回答格式化"""
+        """测试带引用来源的回答格式化：不展示来源，只保留正文和免责声明"""
         answer = Answer(
             id="a_1",
             question_id="q_1",
@@ -339,9 +339,9 @@ class TestBotHandler:
 
         formatted = handler._format_answer(answer)
         assert "回答内容" in formatted
-        assert "来源1" in formatted
-        assert "来源2" in formatted
-        assert "参考来源" in formatted
+        assert "来源1" not in formatted
+        assert "来源2" not in formatted
+        assert "参考来源" not in formatted
         assert "实际系统操作为准" in formatted
 
     def test_format_answer_without_sources(self, handler: BotHandler) -> None:
@@ -360,22 +360,23 @@ class TestBotHandler:
         assert "参考来源" not in formatted
         assert "实际系统操作为准" in formatted
 
-    def test_format_answer_truncates_sources(self, handler: BotHandler) -> None:
-        """测试来源过多时截断"""
+    def test_format_answer_strips_llm_self_reported_sources(
+        self, handler: BotHandler
+    ) -> None:
+        """测试 LLM 自行输出的来源被清理"""
         answer = Answer(
             id="a_1",
             question_id="q_1",
-            text="回答内容",
-            sources=[f"来源{i}" for i in range(10)],
+            text="回答内容\n\n---\n**参考来源:**\n- 知识卡片A",
+            sources=["知识卡片A"],
             confidence=0.85,
             status=AnswerStatus.SUCCESS,
         )
 
         formatted = handler._format_answer(answer)
-        # 最多显示 5 个来源
-        assert "来源0" in formatted
-        assert "来源4" in formatted
-        assert "来源5" not in formatted
+        assert "参考来源" not in formatted
+        assert "知识卡片A" not in formatted
+        assert "实际系统操作为准" in formatted
 
     # ====================================================================
     # 问题长度截断

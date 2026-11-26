@@ -34,17 +34,3 @@ class Answer(BaseModel):
     def is_successful(self) -> bool:
         """判断回答是否成功"""
         return self.status == AnswerStatus.SUCCESS
-
-    def has_sources(self) -> bool:
-        """判断是否有引用来源"""
-        return len(self.sources) > 0
-
-    def format_with_sources(self) -> str:
-        """格式化回答，附带引用来源"""
-        if not self.has_sources():
-            return self.text
-
-        source_text = "\n\n---\n📚 **参考来源**:\n"
-        for i, source in enumerate(self.sources, 1):
-            source_text += f"{i}. {source}\n"
-        return self.text + source_text

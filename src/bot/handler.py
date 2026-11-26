@@ -29,6 +29,7 @@ from src.config import settings
 from src.domain.exceptions import LLMServiceError, QuestionProcessingError
 from src.domain.models import Answer, Message
 from src.services.qa_service import QAService
+from src.shared.constants import DISCLAIMER_MESSAGE
 
 
 class BotHandler:
@@ -408,8 +409,9 @@ class BotHandler:
         """
         格式化回答内容。
 
-        在回答末尾附加引用来源和免责声明。若 LLM 已自行输出来源/免责声明，
-        则不再重复追加（避免同一段内容出现两次）。
+        群里的用户只关心答案本身，不展示命中了哪些知识卡，
+        只在末尾附一句免责声明。若 LLM 已自行输出来源/免责声明，
+        先清理再统一追加。
 
         Args:
             answer: 回答对象
@@ -434,17 +436,7 @@ class BotHandler:
         )
         text = text.rstrip()
 
-        parts = [text]
-
-        # 附加引用来源
-        if answer.sources:
-            source_list = "\n".join(f"- {s}" for s in answer.sources[:5])
-            parts.append(f"\n\n---\n**参考来源:**\n{source_list}")
-
-        # 免责声明
-        parts.append("\n\n> 💡 如有疑问请以实际系统操作为准。")
-
-        return "".join(parts)
+        return f"{text}{DISCLAIMER_MESSAGE}"
 
     async def _handle_error(
         self,
