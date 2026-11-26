@@ -1,0 +1,54 @@
+card_id: sdt-api-freight-query
+type: rule
+title: 清单运费查询怎么查？和账单金额对不上怎么办？
+one_liner: 按订单号或运单号+电话查实际费用，数据来自顺丰实时查。
+body: |
+  【三种查询方式，取决于你传什么】
+
+  **方式一：传订单号**
+  直接按客户订单号查。
+
+  **方式二：只传运单号（不传电话）**
+  系统先用运单号反查到订单号，再按订单号查。
+
+  **方式三：传运单号 + 电话**
+  按运单号加电话尾号查。
+  这种方式适合你有运单号但不知道订单号的场景。
+
+  【数据来源：顺丰实时查】
+  不走本地账单表，是实时去顺丰查。
+  所以：
+  · 刚产生的运单可能查不到（顺丰侧还没出账）
+  · 返回的是**当前**费用，后续可能有调整
+
+  【"和账单对不上"怎么解释】
+  有一种情况要注意：
+  另有「全渠道运费」的数据来源完全不同，
+  那个读的是本地账单明细表，不是实时查。
+  两个接口数据口径不一样，对不上是正常的。
+
+  对账请以清单运费推送（顺丰出账后主动推给你的那套数据）为准。
+
+  【返回内容】
+  包括：运单号、月结账号、计费重量、实际重量、体积、
+  限制类型、子单号列表、费用明细列表。
+  费用明细里每一项都有类型、名称、金额、付款方式、结算方式。
+
+  【失败】
+  查询失败统一报「清单运费查询失败」。
+  常见原因：订单号/运单号都不存在、组织没配顾客编码校验码。
+
+  【前置条件】
+  同样要求组织已配顾客编码和校验码。
+anchors: [清单运费查询, freight, 运费查询, 费用对不上, 实际费用查询, 计费重量, 费用明细, 全渠道运费区别]
+module: 顺店通开放接口
+entry_path: ""
+roles: [客户技术对接人, 二线支持, 财务]
+permissions: []
+source_ref:
+  - docs/openapi-business-logic.md#3.3 清单运费查询
+  - eps-store-core-united-store-be/united-store-open-server/src/main/java/com/sf/united/store/openserver/service/impl/OrderFreightServiceImpl.java#L76
+owner: "01415465"
+verified_at: 2026-11-25
+expires_at: 2027-05-25
+related: [sdt-api-deliver-tm, sdt-api-fee-push-trouble, sdt-api-push-retry-mechanism]

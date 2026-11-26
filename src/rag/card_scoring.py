@@ -54,6 +54,11 @@ class RetrievalConfig:
     weights: dict[str, float]
     threshold: float
     small_corpus_size: int
+    # 规则10：专属域。这些域只服务特定人群（如技术对接人问开放接口），
+    # 普通业务问题不该命中它们，即使卡片正文里出现了业务词。
+    exclusive_domains: frozenset[str] = frozenset()
+    # 属于专属域的卡片模块名（按卡片的 module 字段精确匹配）
+    exclusive_modules: frozenset[str] = frozenset()
 
 
 def load_config(path: str | Path | None = None) -> RetrievalConfig:
@@ -116,6 +121,8 @@ def load_config(path: str | Path | None = None) -> RetrievalConfig:
         weights=dict(raw.get("weights") or {}),
         threshold=float(thresholds.get("keyword_score", 3.0)),
         small_corpus_size=int(thresholds.get("small_corpus_size", 50)),
+        exclusive_domains=frozenset(raw.get("exclusive_domains") or []),
+        exclusive_modules=frozenset(raw.get("exclusive_modules") or []),
     )
 
 
@@ -402,6 +409,19 @@ class CardScorer:
             total *= w.get("domain_conflict", 0.15)
         elif q_domains and not c_domains:
             total *= w.get("domain_unknown", 0.7)
+
+        # 规则10：专属域隔离
+        # 开放接口卡正文会大量出现「订单」「取消」等业务词，因此也会被规则7
+        # 判为「订单」域，于是一条业务问题「怎么取消订单」会被接口卡抢走首位。
+        # 这里按「问题是否命中该专属域」再降一次权：接口问题不受影响，
+        # 业务问题则把接口卡压到业务卡之下。
+        #
+        # 判定用卡片的 module 而非正文关键词：业务卡的 source_ref/正文也会
+        # 提到「开放接口」，用关键词会让业务卡误中降权。
+        card_module = str(card.get("module", "")).strip()
+        if card_module in self.config.exclusive_modules:
+            if not (q_domains & self.config.exclusive_domains):
+                total *= w.get("exclusive_domain_miss", 0.55)
 
         # 规则2：泛化词兜底
         if degraded:

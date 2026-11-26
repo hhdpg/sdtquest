@@ -1,0 +1,50 @@
+card_id: sdt-api-delivery-trigger
+type: rule
+title: 订单放行和退回怎么调？会不会改本地状态？
+one_liner: 用数据类型区分放行或退回，纯转发顺丰，本地不留状态。
+body: |
+  【一个接口，两种动作】
+  靠「数据类型」字段区分：
+  · 71 = 派送通知，也就是**放行**（让顺丰开始派送）
+  · 72 = 通知**退回**（让顺丰退回来）
+
+  必传运单号，不传报「运单号不能同时为空」。
+
+  【它不改本地任何东西】
+  · 不落库
+  · 不发消息
+  · 不记录状态
+  纯转发给顺丰，返回顺丰的处理结果。
+
+  所以「放行后本地状态什么时候变」——
+  要等顺丰的后续路由推送回来才会变，放行接口本身不改。
+
+  【重复调用会怎样】
+  本地没有状态留存，重复发起以顺丰返回为准。
+  顺丰侧一般会告诉你当前状态不允许重复操作。
+
+  【前置配置】
+  组织必须配好顾客编码和校验码，作为访问凭证透传给顺丰。
+  没配同样报「顾客编码,效验码没有配置」。
+
+  【常见失败】
+  · 应用 ID 非法
+  · 组织未配顾客编码/校验码
+  · 运单号不存在或状态不允许（顺丰侧判定）
+  失败时顺丰的原始错误描述会透传出来，看描述定位。
+
+  【和订单确认的区别】
+  · 放行/退回：通知顺丰「开始派」或「退回」
+  · 订单确认：改订单信息（联系人、重量、子母件）
+anchors: [放行, 退回, 派送通知, delivery trigger, dataType 71, dataType 72, 通知退回, 放行派送]
+module: 顺店通开放接口
+entry_path: ""
+roles: [客户技术对接人, 二线支持]
+permissions: []
+source_ref:
+  - docs/openapi-business-logic.md#2.9 delivery trigger
+  - eps-store-core-united-store-be/united-store-open-server/src/main/java/com/sf/united/store/openserver/service/impl/OpenBspDeliveryNoticeServiceImpl.java#L36
+owner: "01415465"
+verified_at: 2026-11-25
+expires_at: 2027-05-25
+related: [sdt-api-confirm-order, sdt-api-cancel-state-machine]

@@ -1,0 +1,49 @@
+card_id: sdt-api-waybill-validate
+type: rule
+title: 运单号校验是校验什么？为什么合法的运单号也报错？
+one_liner: 纯转发顺丰判断，不查本地库，失败分参数错、地址不可达、系统异常三种。
+body: |
+  【它不查顺店通的库】
+  校验完全不依赖顺店通的数据。
+  运单号的格式和可达性**全部交给顺丰判断**。
+
+  所以「这单明明是你们系统下的，为什么校验不通过」——
+  校验看的是顺丰侧的状态，不是本地订单是否存在。
+
+  【三种失败结果的区分】
+  顺丰返回的错误码要分开看：
+  · 参数错误 → 你传的运单号本身格式不对
+  · 地址不可达 → 运单号格式对，但顺丰送不到这个地址
+  · 系统异常 → 顺丰侧临时故障，可以重试
+  · 成功 → 只有「成功」这一种才算合法
+
+  【常见误解】
+  · 校验失败 ≠ 这个运单号被别的客户用了
+  · 校验通过 ≠ 这个运单在顺店通能查到
+  这两件事没有关系。
+
+  【什么时候该用】
+  一般用在「客户拿到一个外部运单号，想先确认现在能不能寄」的场景。
+  比如退货场景，客户手上有个别的渠道的运单号，
+  先校验一下再决定是否接受。
+
+  【一个已知问题】
+  如果校验服务内部返回空，接口会报一个不友好的空指针错误，
+  而不是明确的业务提示。遇到这种情况按「顺丰侧无返回」处理，
+  重试一次即可。
+
+  【和你自己下单的关系】
+  你自己通过开放接口下的单，运单号是顺丰直接分配的，
+  不需要再拿回来校验。这个接口主要用于外部运单号。
+anchors: [运单号校验, validate, 运单号合法性, 运单号不合法, 地址不可达, 运单校验失败, waybillNo validate]
+module: 顺店通开放接口
+entry_path: ""
+roles: [客户技术对接人, 二线支持]
+permissions: []
+source_ref:
+  - docs/openapi-business-logic.md#3.2 运单号校验
+  - eps-store-core-united-store-be/united-store-common/src/main/java/com/sf/united/store/common/service/impl/BspValidateWayBillNoServiceImpl.java#L52
+owner: "01415465"
+verified_at: 2026-11-25
+expires_at: 2027-05-25
+related: [sdt-api-deliver-tm, sdt-api-freight-query]

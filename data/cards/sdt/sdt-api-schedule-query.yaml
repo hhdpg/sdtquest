@@ -1,0 +1,56 @@
+card_id: sdt-api-schedule-query
+type: rule
+title: 调度信息查询一次能查多少条？查不到是什么原因？
+one_liner: 单次最多 20 条，只读本地调度状态表，不调外部。
+body: |
+  【单次上限 20 条（硬限制）】
+  订单号 + 运单号加起来的**总数**不能超过 20 条。
+  超了直接报错，不是截断也不是分批。
+
+  所以批量查要自己分批，一批最多 20 个单号。
+
+  【它查的是什么】
+  查的是订单的**调度状态**：
+  · 订单号 / 运单号
+  · 订单状态码和描述
+  · 快递员工号和电话
+  · 网点编码
+  · 最近时间、预约时间
+  · 承运商编码
+
+  不是物流轨迹。要看轨迹用路由查询接口。
+
+  【数据来源：本地】
+  只读本地的调度状态表，不实时调外部。
+  所以：
+  · 数据有一定延迟（依赖上游推送）
+  · 查不到不等于这个单不存在，可能是调度信息还没回传
+
+  【为什么要有归属校验】
+  会用你的一级组织做归属校验。
+  你只能查到属于你这个组织的单。
+
+  【查不到的情况】
+  调号不对、或者这个单还没有调度信息回传。
+  空结果会返回空数组，不是报错。
+
+  【和订单状态流查询的区别】
+  · 调度信息查询：查调度节点（谁去取件、哪个网点）
+  · 订单状态流查询：查完整的状态流转过程
+  前者更偏「物流执行」，后者更偏「状态历史」。
+
+  【适用场景】
+  客户问「这单派给谁了」「在哪个网点」时用这个，
+  问「这单现在什么状态、之前经历了什么」用状态流。
+anchors: [调度信息, schedule, 调度查询, 派单信息, 快递员信息, 网点信息, 一次20条, 调度状态]
+module: 顺店通开放接口
+entry_path: ""
+roles: [客户技术对接人]
+permissions: []
+source_ref:
+  - docs/openapi-business-logic.md#3.6 调度信息
+  - eps-store-core-united-store-be/united-store-open-server/src/main/java/com/sf/united/store/openserver/service/impl/OrderScheduleServiceImpl.java#L50
+owner: "01415465"
+verified_at: 2026-11-25
+expires_at: 2027-05-25
+related: [sdt-api-route-query-v1-v2, sdt-api-tc-order-flow]

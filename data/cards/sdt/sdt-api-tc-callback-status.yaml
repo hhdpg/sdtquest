@@ -1,0 +1,56 @@
+card_id: sdt-api-tc-callback-status
+type: rule
+title: 同城订单状态码有哪些？回调里 10、12、15、17 分别什么意思？
+one_liner: 10 接单、12 到店、15 配送中、17 完成；内部还会映射成一套自己的状态。
+body: |
+  【回调里的原状态码】
+  · 1 → 订单创建
+  · 2 → 订单取消
+  · 10 → 骑士接单
+  · 12 → 骑士到店
+  · 15 → 配送中（已取货）
+  · 17 → 配送完成
+
+  你在回调报文里拿到的就是这个范围的值。
+
+  【顺店通内部会转成另一套状态】
+  · 10 → 未收件（已接单）
+  · 12 → 已取件
+  · 15 → 派送中
+  · 17 → 已签收
+  · 异常 → 异常件
+  · 顺丰原因取消 → 订单被标记删除（状态字段不变）
+
+  【所以"两边状态对不上"是正常的】
+  如果你们的系统和顺店通的显示不一致，
+  先确认你看的是回调原码还是内部状态。
+
+  【一个风险点：乱序会覆盖】
+  状态更新时**没有版本号或时间戳比较**。
+  如果回调乱序到达（比如 15 先到、12 后到），
+  后到的会把状态覆盖回去。
+
+  这是已知限制。建议你方在接收侧自己做保护：
+  记录已处理的最大状态，收到更小的状态就丢弃。
+
+  【回调查不到单时】
+  按同城订单号查本地单，**查不到会直接返回成功**，不报错。
+  所以「回调来了但状态没变」，
+  第一件要确认的事是这张单在本地存在。
+
+  【重复回调会重复执行】
+  同一条回调重复推送，会重复发微信通知、重复推送收单中心。
+  这也是已知风险。
+anchors: [同城状态码, 回调状态, 10接单, 12到店, 15配送中, 17完成, 状态乱序, 状态覆盖, 同城状态映射]
+module: 顺店通开放接口
+entry_path: ""
+roles: [客户技术对接人, 二线支持]
+permissions: []
+source_ref:
+  - docs/openapi-business-logic.md#8.2 同城回调
+  - docs/notes/C-o2o-city-callback.md#6 值得写进客户知识库的业务点
+  - eps-store-core-united-store-be/united-store-manager/src/main/java/com/sf/united/store/manager/service/impl/CityCallBackServiceImpl.java#L114
+owner: "01415465"
+verified_at: 2026-11-25
+expires_at: 2027-05-25
+related: [sdt-api-tc-callback-return, sdt-api-tc-create-order, sdt-api-tc-order-flow]

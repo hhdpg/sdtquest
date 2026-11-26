@@ -1,0 +1,64 @@
+card_id: sdt-api-route-query-v1-v2
+type: rule
+title: 路由查询有两个版本，有什么区别？为什么查不到路由？
+one_liner: 老版只能查自家单且限 90 天，新版不查本地单但电话必填。
+body: |
+  【两版的根本差异在「要不要先在本地下过单」】
+
+  **老版：必须先在本地下过单**
+  · 会先查本地订单，校验这张单是不是你这个应用的
+  · 下单超过 **90 天** 就报路由查询超时，不能查
+  · 不需要传电话
+  · 按客户订单号查
+
+  **新版：不需要本地有单**
+  · 不查本地订单，直接透传顺丰
+  · **电话必填**，不填报「号码不能为空」
+  · 有订单号就按订单号查，只有运单号就按运单号查
+  · 没有 90 天限制
+
+  【怎么选】
+  · 单是你通过开放接口下的 → 老版够用
+  · 单是别的系统下的、你只有运单号和电话 → **必须用新版**
+  · 下单超过 90 天还要查 → 只能新版
+
+  【为什么查不到路由】
+  按接口分别看：
+
+  **老版查不到**
+  · 下单超 90 天
+  · 这单不属于你这个应用
+  · 本地数据里没有这个单（包括子单没匹配上母单）
+
+  **新版查不到**
+  · 顺丰那边这个单还没有路由节点
+  · 电话不对
+  · 运单号不存在
+
+  **全渠道版查不到**
+  · 非顺丰渠道的单，依赖三方回传的路由数据
+  · 三方没推就没有数据，这个不是故障
+
+  【返回内容】
+  受理时间、受理地点、描述、操作码、原因名称、原因代码。
+  是**节点列表**，按时间顺序。
+
+  【一个共同前提】
+  所有路由查询都要求组织已配顾客编码和校验码。
+
+  【常见误解】
+  「返回空数组」不等于报错。
+  运单刚创建、还没有任何路由节点时，就是空数组。
+anchors: [路由查询, routeQuery, 查询不到路由, 路由为空, 90天限制, 电话必填, 路由接口区别, 全渠道路由, 接口查询路由, 路由查询接口区别]
+module: 顺店通开放接口
+entry_path: ""
+roles: [客户技术对接人, 二线支持]
+permissions: []
+source_ref:
+  - docs/openapi-business-logic.md#4.1 routeQuery vs v2
+  - docs/openapi-business-logic.md#11.7 路由查询返回空
+  - eps-store-core-united-store-be/united-store-open-server/src/main/java/com/sf/united/store/openserver/service/impl/OrderRouteServiceImpl.java#L89
+owner: "01415465"
+verified_at: 2026-11-25
+expires_at: 2027-05-25
+related: [sdt-api-route-pay-query, sdt-api-route-push, sdt-api-schedule-query]

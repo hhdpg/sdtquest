@@ -1,0 +1,56 @@
+card_id: sdt-api-freight-budget-block
+type: rule
+title: 运费预算超了会怎么样？下单会直接被拦吗？
+one_liner: 按组织配置三种处理：需审批、自动转寄付现结、或直接不让下单。
+body: |
+  【什么时候触发】
+  只有同时满足两个条件才走预算管控：
+  · 组织开通了「订单运费额度」这个服务
+  · 本单的付款方式或成本类型命中了预算规则的适用范围
+
+  没开通或没命中，预算规则完全不生效。
+
+  【超预算三种处理方式】
+  由客户在运费预算配置里选定，一个组织同一时间用一种：
+
+  **1. 需审批（默认）**
+  超了不直接拒，进审批流程。
+  审批通过才能继续发。
+
+  **2. 转寄付现结**
+  超了自动把付款方式改成「寄付现结」，
+  这单就不占预算了，可以正常下。
+  注意这只是自动改付款方式，运费还是要付的。
+
+  **3. 无法下单**
+  直接不让下。
+  接口返回里会带「超预算」标志，**这单不会落库**。
+
+  【怎么区分是「拒了」还是「还在审批」】
+  · 返回带超预算标志且没有订单号 → 属于第 3 种，被拒
+  · 返回成功但状态需要等审批 → 属于第 1 种，单在审批中
+  · 返回成功且付款方式被你预期之外地改了 → 属于第 2 种
+
+  【额度怎么算】
+  可用额度 = 上限 − 已扣减 − 已占用。
+  「已占用」是已下单但还没最终扣费的金额。
+  下单时用「可用额度 − 预估运费」判断是否超额。
+  运单取消后，占用的额度会自动退回。
+
+  【每月自动恢复】
+  系统在每月最后一天的晚上自动刷新额度，
+  基于本月预算生成下月预算，占用和扣减清零。
+  所以额度不用手工重置。
+anchors: [超预算, 运费预算, 预算拦截, 额度不足, 需审批, 转寄付现结, 无法下单, 订单运费额度, 预算超额]
+module: 顺店通开放接口
+entry_path: ""
+roles: [客户技术对接人, 财务]
+permissions: []
+source_ref:
+  - docs/openapi-business-logic.md#2.2 统一下单
+  - eps-store-core-united-store-be/united-store-open-server/src/main/java/com/sf/united/store/openserver/service/impl/UniversalCreateOrderServiceImpl.java#L298
+  - sdt-rule-freight-budget
+owner: "01415465"
+verified_at: 2026-11-25
+expires_at: 2027-05-25
+related: [sdt-api-create-order-fail-reasons, sdt-rule-freight-budget]

@@ -1,0 +1,53 @@
+card_id: sdt-api-cancel-v1-v2-diff
+type: glossary
+title: 取消订单有两个接口，该用哪个？
+one_liner: 三方快递单必须用第二个，顺丰单两个都行但第二个功能更全。
+body: |
+  【两个接口的区别在「取消通道」】
+
+  **第一个（基础版）**
+  只支持顺丰自营单。不管你传什么，都当顺丰单去取消。
+  如果这张单其实是三方快递（德邦、韵达这类），
+  用第一个会当顺丰单取消而**失败**。
+
+  **第二个（V2）**
+  会先看订单走的是哪个渠道：
+  · 三方直连月结单 → 调对应三方公司的取消接口，不碰顺丰
+  · 其他渠道 → 和第一个一样走顺丰取消
+
+  【怎么选】
+  · 只发顺丰 → 两个都行，用哪个都可以
+  · 发三方快递 → **必须用 V2**
+  · 不确定 → 直接用 V2，它是超集
+
+  【两个接口前置校验完全一样】
+  状态、归属、订单来源的校验是一样的，见「取消订单有什么条件」那张卡。
+
+  【V2 特有的一条限制】
+  韵达单**超过 30 天不允许取消**，报「超过一个月了，不能取消订单了」。
+  其他三方暂无这个限制。
+
+  【V2 取消失败时的差别】
+  三方取消失败（返回空或非零错误码）时：
+  · **不会删本地单**
+  · 会返回失败原因
+  所以 V2 的三方分支失败后可以直接重试。
+
+  但 V2 走顺丰分支时，仍然是「先删本地再调顺丰」，
+  失败了本地已删，这点和 V1 一样。判断依据是订单渠道。
+
+  【一句话总结】
+  V1 只认顺丰，V2 按渠道分流；三方单用 V1 必失败。
+anchors: [取消接口区别, cancel orderV2, 三方取消, 德邦取消, 韵达取消, 取消订单用哪个, 取消通道, 30天不能取消]
+module: 顺店通开放接口
+entry_path: ""
+roles: [客户技术对接人]
+permissions: []
+source_ref:
+  - docs/openapi-business-logic.md#2.8 cancel order 与 orderV2
+  - docs/openapi-business-logic.md#11.6 三方直连单取消失败
+  - eps-store-core-united-store-be/united-store-open-server/src/main/java/com/sf/united/store/openserver/service/impl/OrderConfirmServiceImpl.java#L150
+owner: "01415465"
+verified_at: 2026-11-25
+expires_at: 2027-05-25
+related: [sdt-api-cancel-state-machine, sdt-api-order-variant-diff]

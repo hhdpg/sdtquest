@@ -1,0 +1,62 @@
+card_id: sdt-api-print-template
+type: rule
+title: 怎么获取标准电子面单模板？要先配好店铺吗？
+one_liner: 必须传平台店铺 ID，会先查店铺拿到授权编码再转发取模板。
+body: |
+  【平台店铺 ID 是必传的】
+  不传直接报错。
+  传了之后，系统会按「平台店铺 ID + 你的应用」去查店铺：
+  · 查不到 → 报「平台店铺 id 没有配置」
+  · 查到了 → 取该店铺的授权编码，塞进请求再转发
+
+  所以要拿模板，前提是这个店铺已经配好了。
+
+  【返回什么】
+  按快递公司分组返回模板列表，每个模板含：
+  · 模板 ID
+  · 模板编码
+  · 模板名称
+  · 类型
+  · 版本
+  · 宽高尺寸
+  · 模板地址
+  · 预览地址
+
+  你可以用预览地址给客户选模板，用模板编码去实际打印。
+
+  【它还支持自定义模板】
+  传「是否自定义模板」+ 自定义内容，可以让丰门按你的排版出模板。
+  一般客户用系统标准模板就够。
+
+  【纯查询，不落库】
+  不写任何数据，也没有幂等概念。
+  可以放心反复调。
+
+  【失败原因】
+  · 平台店铺 ID 为空
+  · 店铺没配置
+  · 丰门返回失败（错误码和描述会透传）
+  · 丰门返回空内容 → 报「响应异常」
+
+  【和打印接口的关系】
+  1. 先用这个接口拿模板列表，选一个
+  2. 再用模板编码去调云打印或插件打印
+  这两步是分开的，模板不是必须调，但调了能让你知道有哪些模板可用。
+
+  【常见用法】
+  在客户的「打印设置」页面里，
+  调这个接口列出可选模板，让客户自己选，
+  记住选择结果，后续打印直接用对应编码。
+anchors: [电子面单模板, 获取模板, getTemplate, 面单模板, 模板列表, 平台店铺ID必填, 自定义模板]
+module: 顺店通开放接口
+entry_path: ""
+roles: [客户技术对接人]
+permissions: []
+source_ref:
+  - docs/openapi-business-logic.md#6.3 fm waybill getTemplate
+  - docs/notes/C-o2o-city-callback.md#17 fm waybill getTemplate
+  - eps-store-core-united-store-be/united-store-open-server/src/main/java/com/sf/united/store/openserver/service/impl/FmServiceImpl.java#L330
+owner: "01415465"
+verified_at: 2026-11-25
+expires_at: 2027-05-25
+related: [sdt-api-cloud-print, sdt-api-oto-print]

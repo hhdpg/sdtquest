@@ -1,0 +1,64 @@
+card_id: sdt-api-monthly-code
+type: rule
+title: 月结码怎么生成？为什么一定要动态码？
+one_liner: 必传月结卡，动态码强制返回，默认 300 秒失效且失败不报错。
+body: |
+  【两个必传】
+  · 月结卡号
+  · 组织必须配好顾客编码和校验码
+
+  【动态码是强制的】
+  你传「是否需要动态码 = 否」也没用，
+  代码里把这个入参**硬编码覆盖成「是」**。
+  所以每次都会返回动态码。
+
+  为什么这样设计：动态码是安全验证的核心，
+  只有静态码起不到防重放的作用。
+
+  【返回什么】
+  · 一个唯一编号（后续查单要用）
+  · 动态码
+  · 描述和返回类型
+
+  【有效期默认 300 秒】
+  可以传自定义失效时间，但必须大于 0。
+  传 0 或负数报「失效时间必须大于 0」。
+
+  【月结卡也要校验】
+  和下单时一样的规则：
+  卡必须挂在当前一级组织下，且通过月结卡校验开关。
+  不过报「月结卡号未验证」。
+
+  【失败时的一个坑】
+  动态码生成失败时，接口**返回成功状态码，但结果里标记失败**。
+  也就是说：
+  · HTTP 是 200
+  · 返回体里有失败标志
+  · **不会抛异常**
+
+  所以你不能只看 HTTP 状态码判断成败，
+  必须检查返回体里的成功标志。
+
+  这点和大多数接口不一样，容易漏判。
+
+  【和「月结付款码查单」的关系】
+  1. 先调这个接口 → 拿到唯一编号 + 动态码
+  2. 再用唯一编号 + 月结卡号去查这个月结卡下的运单
+  两个接口是配套的，编号不能自己拼。
+
+  【典型使用场景】
+  月结客户在自助机上扫码验证身份，
+  验证通过后查看自己的运单。动态码就是那个验证凭据。
+anchors: [月结码生成, createCode, 动态码, 月结码, needDynamicCode, 300秒失效, 返回成功但失败, 月结码失败]
+module: 顺店通开放接口
+entry_path: ""
+roles: [客户技术对接人, 财务]
+permissions: []
+source_ref:
+  - docs/openapi-business-logic.md#6.4 openNuts monthly createCode
+  - docs/notes/C-o2o-city-callback.md#18 openNuts monthly createCode
+  - eps-store-core-united-store-be/united-store-open-server/src/main/java/com/sf/united/store/openserver/service/impl/MonthlyCodeServiceImpl.java#L74
+owner: "01415465"
+verified_at: 2026-11-25
+expires_at: 2027-05-25
+related: [sdt-api-monthly-waybill-query, sdt-api-monthly-card-check]

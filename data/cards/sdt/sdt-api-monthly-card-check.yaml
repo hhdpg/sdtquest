@@ -1,0 +1,54 @@
+card_id: sdt-api-monthly-card-check
+type: rule
+title: 传月结卡号报「未验证」，月结卡是什么规则？
+one_liner: 只有挂在当前一级组织下、且通过校验的月结卡才能用，还有总开关控制。
+body: |
+  【月结卡号要过三道】
+
+  **第一道：必须归属于当前一级组织**
+  下单时传的月结卡号，会拿你这个应用对应的一级组织去查。
+  这个组织下面没挂这张卡，就报「月结卡号未验证」。
+  卡挂在其他组织下不算数，即使是同一家公司的另一个子公司。
+
+  **第二道：受总开关控制**
+  有个「月结卡号校验」的总开关。
+  · 开关打开：所有单都要校验，没过的直接拒
+  · 开关关闭：跳过校验
+  所以「同样传了卡，为什么别家能过我们不行」，
+  先查开关和组织的挂卡情况。
+
+  **第三道：临时白名单可以绕过**
+  还有一份临时白名单配置。
+  组织命中白名单时，校验直接通过，不查挂卡关系。
+
+  【用在哪几个接口】
+  · 标准下单 / 店配下单：传了月结卡就校验
+  · O2O 电子面单取号：传了月结卡才校验（不传不校验）
+  · 订单确认：传了月结卡才校验
+  · 月结码生成：**必填**，一定校验
+
+  【到付与月结的关系】
+  到付单默认是收方付现结，不占寄方月结。
+  但另有「到付月结规则」配置：
+  开启并维护了月结卡后，到付也能享寄方月结的折扣价。
+  这是折扣，不是改付款方式。
+
+  【排查建议】
+  报「月结卡号未验证」时按顺序确认：
+  1. 这张卡挂在你申请接口的那个一级组织下了吗
+  2. 组织的月结卡可能挂在更上级，但校验是查当前组织
+  3. 总开关是不是刚被关掉或打开
+  4. 是否在临时白名单里
+anchors: [月结卡未验证, 月结卡号校验, 月结卡规则, monthlyCard, customNumber, 月结卡号不通过, 月结卡白名单, 到付月结折扣, 接口传月结卡报错]
+module: 顺店通开放接口
+entry_path: ""
+roles: [客户技术对接人, 二线支持]
+permissions: []
+source_ref:
+  - docs/openapi-business-logic.md#2.2 统一下单
+  - docs/openapi-business-logic.md#6.1 O2O 电子面单取号
+  - eps-store-core-united-store-be/united-store-common/src/main/java/com/sf/united/store/common/service/impl/CommonCustomNumberServiceImpl.java#L314
+owner: "01415465"
+verified_at: 2026-11-25
+expires_at: 2027-05-25
+related: [sdt-api-create-order-fail-reasons, sdt-api-monthly-code, sdt-glossary-monthly-billing-modes]

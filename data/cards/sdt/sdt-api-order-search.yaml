@@ -1,0 +1,61 @@
+card_id: sdt-api-order-search
+type: rule
+title: 下单结果查询报「取消订单失败」是怎么回事？
+one_liner: 是错误码复用的问题，实际是查询异常，不是你的单被取消了。
+body: |
+  【这是一个会让人误判的错误提示】
+
+  查询订单结果时如果出错，
+  返回的报错文案是「取消订单失败」。
+
+  原因：代码里复用了取消订单那个错误码。
+  查询异常和取消失败用的是同一个码。
+
+  **所以看到「取消订单失败」时，先确认你调的是哪个接口。**
+  调的是查询接口，那就是查询异常；
+  调的是取消接口，才是真的取消失败。
+
+  【这个接口能查什么】
+  · 订单状态
+  · 备注
+  · 异常原因
+
+  传客户订单号或运单号都行，至少传一个。
+
+  【查询流程】
+  1. 调顺丰查
+  2. 用返回的首个运单号查本地数据补状态
+  3. 组合返回
+
+  所以如果顺丰查到了但本地查不到，可能返回的状态信息不全。
+
+  【两种查询模式】
+  · 只查顺丰的单
+  · 全渠道查询：先判断物流公司，顺丰走顺丰查询，
+    其他物流公司走本地数据
+
+  全渠道查询时，非顺丰的查询结果来自本地，
+  如果本地没有这个三方单的数据，就查不到。
+
+  【常见失败原因】
+  · 订单号和运单号都没传
+  · 顺丰返回无运单号（说明顺丰侧没有这个单）
+  · 本地也查不到这个单 → 报订单不存在
+  · 组织没配顾客编码校验码
+
+  【一个计费口径提醒】
+  文档上标着「付费接口」，但代码里**没有扣费逻辑**。
+  接入前建议和商务确认实际计费方式，不要按文档推断。
+anchors: [下单结果查询, order search, 取消订单失败, 查询报取消失败, 订单不存在, 全渠道查询, 付费接口]
+module: 顺店通开放接口
+entry_path: ""
+roles: [客户技术对接人, 二线支持]
+permissions: []
+source_ref:
+  - docs/openapi-business-logic.md#3.5 下单结果查询
+  - docs/openapi-business-logic.md#12 代码缺陷与风险清单
+  - eps-store-core-united-store-be/united-store-open-server/src/main/java/com/sf/united/store/openserver/service/impl/OrderSearchServiceImpl.java#L61
+owner: "01415465"
+verified_at: 2026-11-25
+expires_at: 2027-05-25
+related: [sdt-api-deliver-tm, sdt-api-freight-query, sdt-api-error-code-retryable]

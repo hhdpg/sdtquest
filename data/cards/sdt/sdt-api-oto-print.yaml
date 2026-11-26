@@ -1,0 +1,55 @@
+card_id: sdt-api-oto-print
+type: rule
+title: O2O 插件打印一次最多打几张？模板编码不支持怎么办？
+one_liner: 一次最多 10 个主单号，模板只认三种编码，其他一律拒绝。
+body: |
+  【两个硬限制】
+
+  **1. 主单号最多 10 个**
+  一次请求最多传 10 个主单号，超了直接拒。
+  要打更多就分多次。
+
+  **2. 模板编码只认三种**
+  · 不传、或传 130 → 标准面单模板
+  · 传 165 → 另一种专用模板
+  · 其他任何值 → 报「暂不支持该模板编码」
+
+  没有「自动选模板」的逻辑，必须明确传。
+
+  【必须指定打印哪个单据】
+  三个开关至少一个设为 1：打母单 / 打子单 / 打父单。
+  一个都不选 → 报「请选择面单类型」。
+
+  【运单必须存在】
+  每个主单号都会去查本地面单订单表（要求状态有效）。
+  只要有一个不存在，**整批都失败**，报「以下运单号不存在」并列出具体哪些。
+  所以批量打印前先确认运单号都下发成功了。
+
+  【子单怎么传】
+  子单号用逗号分隔，放在子单字段里，跟着主单一起打。
+
+  【返回什么】
+  返回打印报文和访问凭证，供打印插件使用。
+  **不落库、不生成文件**，真正的打印动作由客户端插件完成。
+  访问凭证从顺丰开放平台取，带缓存有效期，你拿到的可能是缓存里的。
+
+  【和云打印的区别】
+  云打印返回 PDF 下载链接，通用；O2O 插件打印返回报文 + 凭证，依赖客户端插件。
+  服务端直接出 PDF 选云打印更合适。
+
+  【失败原因速查】
+  没选面单类型、主单号为空或超过 10 个、模板编码不支持、
+  运单号不存在、组织没配顾客编码校验码、取凭证失败。
+anchors: [O2O插件打印, 插件打印, oto directOrder, 打印模板, 模板编码不支持, 最多10张, 请选择面单类型, 运单号不存在]
+module: 顺店通开放接口
+entry_path: ""
+roles: [客户技术对接人, 二线支持]
+permissions: []
+source_ref:
+  - docs/openapi-business-logic.md#6.2 其余 O2O
+  - docs/notes/C-o2o-city-callback.md#14 cloud directOrder
+  - eps-store-core-united-store-be/united-store-open-server/src/main/java/com/sf/united/store/openserver/service/impl/OtoOpenServiceImpl.java#L1622
+owner: "01415465"
+verified_at: 2026-11-25
+expires_at: 2027-05-25
+related: [sdt-api-cloud-print, sdt-api-print-template, sdt-api-oto-take-number]

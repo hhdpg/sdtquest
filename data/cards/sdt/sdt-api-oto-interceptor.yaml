@@ -1,0 +1,65 @@
+card_id: sdt-api-oto-interceptor
+type: rule
+title: O2O 拦截接口能做什么？重复调会怎样？
+one_liner: 能转寄、退回、改派、改收件人等十种处理，但没有幂等会重复建工单。
+body: |
+  【它能做的十种处理】
+  · 转寄
+  · 退回
+  · 优先派送
+  · 再次派送
+  · 改派到自取点
+  · 改派上门
+  · 改派送时间
+  · 改收件人
+  · 改付款方式
+  · 改代收金额
+
+  靠「服务编码」字段区分，传其他值报「服务编码不正确」。
+
+  【前置条件】
+  运单号必须在本地面单订单表里存在且状态有效。
+  不存在会直接拒。
+
+  【调一次会发生什么】
+  1. 建一张工单（类型是理赔类、来源标记为 API、状态待处理）
+  2. 写两条日志（接口同步、工单类型说明）
+  3. 同步到拦截服务
+
+  【没有幂等（重要）】
+  **同一个运单号重复调用，会生成多张工单。**
+  网络超时后盲目重试，就会看到一堆重复工单。
+
+  建议你方在调用侧自己做防重：
+  用运单号 + 服务编码做唯一约束，或者先查一下有没有待处理的工单。
+
+  【和标准工单的关系】
+  这个接口建的工单会进入顺店通的工单体系，
+  后续可以在管理端看到和处理。
+  所以它不是「直接通知顺丰」，而是「建工单 + 同步拦截服务」两步。
+
+  【典型失败】
+  · 运单号不存在
+  · 服务编码不正确
+  · 组织没配顾客编码校验码
+  · 同步拦截服务失败
+
+  【什么时候用】
+  客户在你们的系统里发起「我要改地址」「我要退回」这类请求，
+  你调这个接口把诉求转成顺店通的工单。
+
+  如果只是「通知顺丰开始派送」或「退回货物」，
+  用「订单放行/退回」接口更直接，不需要建工单。
+anchors: [O2O拦截, 拦截接口, 转寄, 退回, 改派, 改收件人, 理赔工单, 拦截工单, 重复工单, waybillintercepter]
+module: 顺店通开放接口
+entry_path: ""
+roles: [客户技术对接人, 二线支持]
+permissions: []
+source_ref:
+  - docs/openapi-business-logic.md#6.2 其余 O2O
+  - docs/notes/C-o2o-city-callback.md#16 waybillintercepterCommon
+  - eps-store-core-united-store-be/united-store-open-server/src/main/java/com/sf/united/store/openserver/service/impl/OtoOpenServiceImpl.java#L1356
+owner: "01415465"
+verified_at: 2026-11-25
+expires_at: 2027-05-25
+related: [sdt-api-delivery-trigger, sdt-api-oto-take-number]

@@ -1,0 +1,39 @@
+card_id: sdt-api-how-to-get-appid
+type: task
+title: 对接开放接口前要准备什么？应用 ID 和密钥从哪来？
+one_liner: 找顺丰商务申请应用 ID 与密钥，同时确认组织已配好顾客编码和校验码。
+body: |
+  【两套凭证，缺一不可】
+
+  **第一套：接口凭证（appId / appSecret）**
+  向顺丰商务/项目经理申请，线下给到，不走线上。
+  appId 本质是你方**一级组织的组织 ID**（纯数字）。
+  appSecret 只在算签名时用，不要出现在请求报文里，也不要外传。
+
+  **第二套：顺丰侧凭证（顾客编码 / 校验码）**
+  这是组织维度的配置，不是账号维度的。
+  后台没配的话，几乎所有下单、查询、取消接口都会直接报
+  「顾客编码,效验码没有配置」——这类报错不是你的代码问题。
+
+  【怎么确认第二套配好了】
+  先用一个最简单的查询接口试（比如时效查询）。
+  能返回数据就说明配好了；报「顾客编码,效验码没有配置」
+  就说明组织侧还差这一步，让顺丰实施同学补。
+
+  【开通顺序建议】
+  1. 拿到 appId / appSecret
+  2. 先调时效查询验证签权和配置都通
+  3. 再调下单（下单会真实建单，不要一上来就试）
+  4. 最后接推送类接口（需要你方先提供接收地址）
+anchors: [appId怎么申请, appSecret, 接口凭证, 顾客编码, 效验码, customerCode, checkCode, us_open_config, 对接准备, 接入准备]
+module: 顺店通开放接口
+entry_path: ""
+roles: [客户技术对接人, 实施人员]
+permissions: []
+source_ref:
+  - docs/openapi-business-logic.md#1.3 边界与坑
+  - eps-store-core-united-store-be/united-store-open-server/src/main/java/com/sf/united/store/openserver/controller/AbstractController.java#L34
+owner: "01415465"
+verified_at: 2026-11-25
+expires_at: 2027-05-25
+related: [sdt-api-sign-howto, sdt-api-timestamp-window, sdt-api-auth-error-diff]

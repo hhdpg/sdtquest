@@ -1,0 +1,52 @@
+card_id: sdt-api-create-order-fail-reasons
+type: trouble
+title: 开放接口下单失败，一般是什么原因？
+one_liner: 按概率排：组织没配顾客编码、产品已失效、箱号与件数不符、月结卡未验证。
+body: |
+  【按实际发生频率排序，从高到低】
+
+  **1. 寄件组织不属于这个应用的一级组织**
+  报「寄件组织不存在」。应用 ID 对应一个一级组织，只能给它的本组织或子组织下单。
+
+  **2. 组织没配顾客编码 / 校验码**
+  报「顾客编码,效验码没有配置」。这是顺丰侧配置，不是你传漏参数。
+
+  **3. 快递产品编码已失效** → 换一个有效编码。
+
+  **4. 箱号问题（最常见的一类）**
+  · 箱号数量和件数不一致（必须一一对应）
+  · 箱号超过 1000 个，或长度不在 1–50
+  · 箱号已被别的单用过（受全局唯一性窗口限制）
+
+  **5. 件数或物品超上限**
+  件数默认 300，物品列表默认 300 条，以客户配置为准。
+
+  **6. 月结卡号没在顺店通验证过** → 报「月结卡号未验证」。
+
+  **7. 区域城配用了不允许的增值**
+  只允许保价、代收，签回单、微派、微签一律不能用。
+
+  **8. 国补单一票多件，或缺任务编码**
+  国补单强制一票一件，且必须传微派商户码和任务编码。
+
+  **9. 重复的客户订单号**
+  开启查重后，180 天内同样的客户订单号直接拒。
+
+  **10. 运费额度不足**
+  按配置走三种：需审批 / 自动转寄付现结 / 直接不让下。
+
+  【容易误判的现象】
+  报了下单失败但订单还能查到。这是正常的：先落库再调顺丰，
+  顺丰失败后订单停在「已导入」不会自动删。详见对应卡片。
+anchors: [下单失败, 下单报错, 创建订单失败, 寄件组织不存在, 顾客编码未配置, 箱号重复, 月结卡号未验证, 超预算, 产品编码失效, 下单为什么失败]
+module: 顺店通开放接口
+entry_path: ""
+roles: [客户技术对接人, 二线支持]
+permissions: []
+source_ref:
+  - docs/openapi-business-logic.md#11.2 为什么下单失败
+  - eps-store-core-united-store-be/united-store-open-server/src/main/java/com/sf/united/store/openserver/service/impl/UniversalCreateOrderServiceImpl.java#L298
+owner: "01415465"
+verified_at: 2026-11-25
+expires_at: 2027-05-25
+related: [sdt-api-order-created-but-failed, sdt-api-idempotent-scope, sdt-api-boxno-rules, sdt-api-subsidy-order-rules]

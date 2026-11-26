@@ -1,0 +1,52 @@
+card_id: sdt-api-confirm-order
+type: rule
+title: 订单确认接口是干什么的？确认失败是什么原因？
+one_liner: 用来改联系人、改重量、确认子母件，顺店通侧不校验状态。
+body: |
+  【它能改什么】
+  · 修改寄收联系人信息
+  · 修改其他客户的订单
+  · 确认重量、体积
+  · 申报子母件号码
+  · 确认月结卡号
+  · 要求返回运单号
+  · 确认面单尺寸
+
+  传客户订单号或运单号都行，只传运单号时代码会反查客户订单号。
+
+  【一个反直觉的点：顺店通侧不校验订单状态】
+  能不能确认**完全由顺丰判定**。
+  你传一个已签收的单去确认，顺店通不会拦，是顺丰返回失败。
+
+  所以「为什么这个状态还能调确认」——因为它只管转发。
+
+  【确认失败的判断】
+  顺丰返回的状态不等于「确认成功」时，统一报「订单确认返回不成功」。
+  具体原因在顺丰返回里，但顺店通把它统一包成一个码。
+  排查时要看顺丰侧的原始描述，不能只看得这个统一码。
+
+  【国补单的特殊限制】
+  · 只允许在**派件前**修改
+  · 只传运单号且订单已到派送中以后 → 报「国补订单只能在派件前修改订单」
+  · 必须带微派商户码和任务编码
+
+  【和「订单放行/退回」的区别】
+  · 订单确认：改订单信息（联系人、重量、子母件）
+  · 放行/退回：通知顺丰放行派送或退回货物
+  两个完全不同的动作，别搞混。
+
+  【落库】
+  确认本身只记请求日志，不改订单主体。
+  订单主体由顺丰回写和后续路由推送更新。
+anchors: [订单确认, confirm, 确认接口, 修改订单, 改联系人, 改重量, 子母件确认, 确认失败, bsp订单确认返回不成功]
+module: 顺店通开放接口
+entry_path: ""
+roles: [客户技术对接人, 二线支持]
+permissions: []
+source_ref:
+  - docs/openapi-business-logic.md#2.6 cancel confirm 顺丰订单确认
+  - eps-store-core-united-store-be/united-store-open-server/src/main/java/com/sf/united/store/openserver/service/impl/OrderConfirmServiceImpl.java#L358
+owner: "01415465"
+verified_at: 2026-11-25
+expires_at: 2027-05-25
+related: [sdt-api-delivery-trigger, sdt-api-subsidy-order-rules, sdt-api-cancel-state-machine]

@@ -1,0 +1,42 @@
+card_id: sdt-api-sign-howto
+type: task
+title: 接口签名 sign 怎么算？为什么我的签名老是报错？
+one_liner: 四个值按字典序排好直接拼接算 MD5 32 位，注意不能加任何分隔符。
+body: |
+  【参与签名的只有四个值】
+  appId、requestId、timestamp、appSecret。
+
+  注意：**业务字段不参与签名，接口路径也不参与**。
+  很多客户习惯把报文 body 一起签，这里是错的。
+
+  【三步算完】
+  1. 把四个值按**字典序（字符编码顺序）从小到大排序**
+  2. 直接首尾拼成一个字符串，**中间不加任何分隔符**
+  3. 对这个字符串做 MD5，取 32 位，**小写**
+
+  【最容易错的三点】
+  · 排序是按字符串比较，不是按你写的顺序。
+    比如 requestId 是 UUID，通常会排在 timestamp 前面或后面，
+    取决于具体字符，不能想当然。
+  · 拼接不能有逗号、空格、下划线。
+  · MD5 结果要小写。有客户用大写，服务端比对不通过。
+
+  【时间戳要按原样参与】
+  sign 里用的 timestamp 必须和报文里传的完全一致，
+  包括位数（10 位秒 / 13 位毫秒不能混）。
+
+  【自检方法】
+  拿一篇工具的在线 MD5 算一遍，和代码结果比对。
+  如果两边不一致，先检查排序和是否带了分隔符。
+anchors: [签名怎么算, sign计算, 签名算法, MD5签名, 签名不通过, 签名错误, 加签, SignUtil, 字典序排序]
+module: 顺店通开放接口
+entry_path: ""
+roles: [客户技术对接人]
+permissions: []
+source_ref:
+  - docs/openapi-business-logic.md#1.2 签名与时间窗
+  - eps-store-core-united-store-be/united-store-common/src/main/java/com/sf/united/store/common/utils/SignUtil.java#L31
+owner: "01415465"
+verified_at: 2026-11-25
+expires_at: 2027-05-25
+related: [sdt-api-how-to-get-appid, sdt-api-timestamp-window, sdt-api-auth-error-diff]

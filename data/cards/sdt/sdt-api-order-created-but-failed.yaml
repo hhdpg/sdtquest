@@ -1,0 +1,47 @@
+card_id: sdt-api-order-created-but-failed
+type: trouble
+title: 下单接口报错了，但系统里还能查到这张单，怎么回事？
+one_liner: 顺店通先落库再调顺丰，顺丰失败后订单停在「已导入」不会自动删。
+body: |
+  【这是设计如此，不是数据错乱】
+
+  下单的执行顺序是：
+  1. 先在顺店通落库（订单状态 = 已导入）
+  2. 再拿这批数据去调顺丰下单
+  3. 顺丰成功后，状态才改成「未收件」并回写运单号
+
+  所以只要第 2 步失败，就会出现：
+  **接口返回失败，但库里有一张「已导入」的单。**
+
+  【会一直留着吗】
+  会。系统不会自动删这张单。
+  它没有运单号，不会产生任何物流轨迹，也不会扣费。
+
+  【怎么处理】
+  · 用同一个客户订单号重新下单：会被判重复单（如果开了查重），
+    或者生成第二张单 —— 两种都不是你想要的。
+  · 正确做法：调取消接口把这张「已导入」的单取消掉，再重新下单。
+  · 已取件之后不能取消（状态 ≥ 2 就拒），
+    但「已导入」状态正好在可取消范围内。
+
+  【为什么不先调顺丰再落库】
+  历史原因是为了保证三方接口和数据库的一致性。
+  代价就是现在这样：顺丰失败时留下一条脏数据。
+
+  【给客户的建议】
+  生产上遇到下单失败，**判断标准不是「接口是否成功」，
+  而是「库里这张单是什么状态」**。
+  状态是「已导入」就说明顺丰那一步没成。
+anchors: [下单报错但订单还在, 已导入状态, 订单残留, 下单失败订单存在, 脏数据, 落库先于下单, 订单没运单号]
+module: 顺店通开放接口
+entry_path: ""
+roles: [客户技术对接人, 二线支持]
+permissions: []
+source_ref:
+  - docs/openapi-business-logic.md#11.1 下单报错了但订单还能查到
+  - docs/openapi-business-logic.md#2.2 统一下单
+  - eps-store-core-united-store-be/united-store-open-server/src/main/java/com/sf/united/store/openserver/service/impl/UniversalCreateOrderServiceImpl.java#L298
+owner: "01415465"
+verified_at: 2026-11-25
+expires_at: 2027-05-25
+related: [sdt-api-create-order-fail-reasons, sdt-api-cancel-state-machine]

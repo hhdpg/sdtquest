@@ -1,0 +1,60 @@
+card_id: sdt-api-route-pay-query
+type: rule
+title: 全渠道路由查询为什么要钱？什么时候扣费？
+one_liner: 新版按单号去重计费，查询成功才扣一次，重复查同一单号不再扣。
+body: |
+  【两个版本，一个免费一个付费】
+
+  **老版全渠道路由查询：免费**
+  只查，不扣费，不落查询记录。
+
+  **新版全渠道路由查询：付费**
+  需要开通「预充值账户」这个服务，且账户要有余额。
+
+  【扣费规则（关键）】
+  · 按**运单号**去重
+  · 同一个运单号，**第一次查询成功才扣一次费**
+  · 重复查询同一个运单号，**不再扣费**，结果直接返回
+  · 查询失败不扣费
+
+  所以同一个单你反复查，只有第一次花钱。
+
+  【余额不足会怎样】
+  两种报错：
+  · 服务没开通 → 报「服务未开通」
+  · 余额不够 → 报「余额不足」或「该账户未充值」
+
+  这两种都是直接拒绝，不会先查后付费。
+
+  【并发时会怎样】
+  系统会按单号加锁、按组织加余额锁。
+  如果同一时刻有大量请求抢同一把锁，抢不到的会报「系统繁忙」。
+
+  这不是系统故障，是并发保护的正常表现，重试即可。
+
+  【为什么要这么设计】
+  全渠道查询要调外部多个渠道，成本高。
+  按单号去重计费是为了避免同一单被反复收费，
+  同时也避免客户用这个接口做高频轮询。
+
+  【给客户的建议】
+  · 接入前先开通预充值账户并充值
+  · 如果只是查自己下的顺丰单，用免费的老版就够
+  · 需要查三方物流、或者要跨渠道统一查，才用付费版
+
+  【一个口径提醒】
+  「下单结果查询」文档上也标了付费，但代码里没有扣费实现。
+  两个接口的计费口径不一样，接入前都要和商务确认。
+anchors: [全渠道路由查询, 付费接口, 路由查询扣费, 预充值账户, 余额不足, 服务未开通, 单号去重计费, 重复查询免费]
+module: 顺店通开放接口
+entry_path: ""
+roles: [客户技术对接人, 财务]
+permissions: []
+source_ref:
+  - docs/openapi-business-logic.md#4.2 allChannelRouteQuery vs v2
+  - docs/openapi-business-logic.md#11.8 全渠道路由查询为什么被拒
+  - eps-store-core-united-store-be/united-store-open-server/src/main/java/com/sf/united/store/openserver/service/impl/AllChannelRouteQueryNewServiceImpl.java#L87
+owner: "01415465"
+verified_at: 2026-11-25
+expires_at: 2027-05-25
+related: [sdt-api-route-query-v1-v2, sdt-api-order-search]

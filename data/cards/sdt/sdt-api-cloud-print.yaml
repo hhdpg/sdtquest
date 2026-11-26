@@ -1,0 +1,53 @@
+card_id: sdt-api-cloud-print
+type: rule
+title: 云打印接口怎么用？拿到的 pdf 为什么打不开？
+one_liner: 返回的链接要用 token 下载，有效期 24 小时，且必须按序号排序。
+body: |
+  【一次请求拿到什么】
+  母单 + 签回单 + 所有子单**一次全部给你**，不需要一张张调。
+
+  【返回的是下载链接，不是文件内容】
+  返回里有一个文件列表，每项含：下载地址、访问凭证、运单号、序号、页数。
+
+  【打不开的三个原因】
+
+  **1. 没带 token**
+  下载地址不能直接访问，必须带上对应的访问凭证头。
+  浏览器直接粘贴链接打不开。
+
+  **2. 过期了**
+  凭证有效期 **24 小时**，隔一天再来下载就打不开，要重新调接口拿新链接。
+
+  **3. 顺序错了**
+  **文件列表顺序不保证！** 必须按「序号」字段排序后再打印，
+  否则会出现母单和子单错乱、签回单插在中间这种问题。
+
+  【模板编码怎么选】
+  传 1、2、3 三个值，对应三种标准面单模板：1 大面单（常用）、2 中面单、3 小面单。
+  具体选哪个取决于打印机和纸张；传其他值报参数错误。
+
+  【可选的附加信息】
+  签回单运单号、收寄双方电话后六位（打印在面单上）、
+  是否打印 logo、子单号（逗号分隔多个）。
+
+  【失败】
+  调顺丰云打印失败 → 报「生成 PDF 失败」。
+  常见原因：模板编码越界、主单号为空、顺丰侧临时故障。
+
+  【和 O2O 插件打印的区别】
+  · 云打印：返回 PDF 下载链接，你自己决定怎么打
+  · O2O 插件打印：返回打印报文 + 访问凭证，走打印机插件
+  前者通用，后者适合有打印插件客户端的场景。
+anchors: [云打印, cloundPrint, 面单打印, pdf打不开, 打印token, 打印顺序, 模板编码, 子单打印, 签回单]
+module: 顺店通开放接口
+entry_path: ""
+roles: [客户技术对接人, 二线支持]
+permissions: []
+source_ref:
+  - docs/openapi-business-logic.md#5.1 云打印
+  - docs/openapi-business-logic.md#11.12 云打印拿到的 pdf 打不开
+  - eps-store-core-united-store-be/united-store-open-server/src/main/java/com/sf/united/store/openserver/service/impl/CloundPrintServiceImpl.java#L29
+owner: "01415465"
+verified_at: 2026-11-25
+expires_at: 2027-05-25
+related: [sdt-api-oto-print, sdt-api-print-template]

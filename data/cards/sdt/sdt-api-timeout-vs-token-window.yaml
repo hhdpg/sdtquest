@@ -1,0 +1,49 @@
+card_id: sdt-api-timeout-vs-token-window
+type: glossary
+title: 时间戳超时到底是 15 分钟还是 3 分钟？两个接口为什么不一样？
+one_liner: 普通开放接口 15 分钟，第三方 Token 接口只有 180 秒，别混用。
+body: |
+  【同一套系统里，时间窗有两档】
+
+  **绝大多数接口：±15 分钟**
+  下单、查询、取消、路由、打印、同城，全部是这一档。
+  报错文案是「request timestamp timeout 15 minutes」。
+
+  **第三方 Token 获取接口：±180 秒（3 分钟）**
+  报错文案是「时间错误」。
+
+  【为什么会这样】
+  第三方 Token 接口是后来加的、面向 H5 跳转认证的独立链路，
+  安全要求更高，所以时间窗收得更紧。
+
+  它在代码里走的是自己的解密和校验流程，
+  不经过通用的那个鉴权方法。
+
+  【实际影响】
+  · 如果你在 Token 接口上复用了普通接口的时间戳缓存逻辑
+    → 会大概率报「时间错误」，因为缓存超过 3 分钟就失效了
+  · 反过来，在普通接口上用 3 分钟的时间窗限制
+    → 没问题，只是没必要那么严格
+
+  【建议】
+  两套调用分开实现：
+  · 普通接口：时间戳每次现取，5 分钟内都还安全
+  · Token 接口：时间戳必须现取现用，不要有任何缓存或排队延迟
+
+  【顺带一个重试相关的提醒】
+  推送类接口重试时，必须**重新生成 requestId、timestamp、sign 三个值**。
+  沿用旧的时间戳和签名会直接失败。
+  我们自己的推送重推就是这个做法。
+anchors: [时间戳超时, 15分钟, 180秒, 3分钟, 时间窗不一样, 时间错误, 重试时间戳, 时间戳缓存]
+module: 顺店通开放接口
+entry_path: ""
+roles: [客户技术对接人, 二线支持]
+permissions: []
+source_ref:
+  - docs/openapi-business-logic.md#1.2 签名与时间窗
+  - docs/openapi-business-logic.md#6.5 getThirdToken
+  - eps-store-core-united-store-be/united-store-open-server/src/main/java/com/sf/united/store/openserver/util/CheckParamUtil.java#L69
+owner: "01415465"
+verified_at: 2026-11-25
+expires_at: 2027-05-25
+related: [sdt-api-timestamp-window, sdt-api-third-token, sdt-api-push-retry-mechanism]

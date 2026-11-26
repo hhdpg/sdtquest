@@ -1,0 +1,52 @@
+card_id: sdt-api-order-variant-diff
+type: glossary
+title: 统一下单有好几个接口，标准、店配、轩尼诗到底有什么不同？
+one_liner: 不是版本迭代，是面向不同客户和业态的分支，按你方归属选一个。
+body: |
+  【四个变体，四类客户】
+
+  **1. 标准下单**
+  最基础的顺丰下单。只下顺丰单，不判调度规则、不判自动合单、不校验区域城配。
+  大部分客户用这个。
+
+  **2. 电力/三方下单**
+  支持顺丰单，也支持三方快递（快递鸟月结、三方直连）。
+  靠物流公司编码区分：不传或传顺丰就走顺丰，
+  传其他物流公司就走三方分支，走三方时会用你方配置的物流公司凭证。
+
+  **3. 店配下单 V2（能力最全）**
+  在电力版基础上多四件事：
+  · 调度规则命中后，用规则里的物流公司和产品**覆盖你传的入参**
+  · 自动合单（按收寄组织、收件人信息或订单号判定），命中就转成追加子单
+  · 区域城配与 SOP 标签校验
+  · 成功后额外写一张面单路由临时表，供后续查询
+
+  如果你的业务有调度分流或合单需求，用这个。
+
+  **4. 轩尼诗专用**
+  = 标准下单 + 成功后写入提货单映射。
+  多传一个提货单地址字段。
+  映射写入失败只打日志，不影响下单成功。
+
+  【怎么选】
+  · 只发顺丰 → 标准
+  · 要发三方快递 → 电力/三方
+  · 要调度规则 + 自动合单 + 区域城配 → 店配 V2
+  · 是轩尼诗业务 → 专用接口
+
+  【一个注意点】
+  店配 V2 的调度规则会覆盖你传的物流公司和产品，
+  所以如果你发现自己传的产品没生效，先查是不是被调度规则接管了。
+anchors: [统一下单区别, 下单接口区别, 标准下单, 店配下单, 轩尼诗下单, 电力下单, 三方下单, 用哪个下单接口, 调度规则覆盖]
+module: 顺店通开放接口
+entry_path: ""
+roles: [客户技术对接人, 实施人员]
+permissions: []
+source_ref:
+  - docs/openapi-business-logic.md#2.3 electric createOrder 与 V2
+  - docs/openapi-business-logic.md#2.4 createOrderXns
+  - eps-store-core-united-store-be/united-store-open-server/src/main/java/com/sf/united/store/openserver/controller/UniversalCreateOrderController.java#L134
+owner: "01415465"
+verified_at: 2026-11-25
+expires_at: 2027-05-25
+related: [sdt-api-create-order-fail-reasons, sdt-api-boxno-rules]

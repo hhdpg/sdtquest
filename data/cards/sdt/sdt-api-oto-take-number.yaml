@@ -1,0 +1,50 @@
+card_id: sdt-api-oto-take-number
+type: rule
+title: O2O 取号走丰门还是顺丰？平台店铺 ID 为什么要传？
+one_liner: 不传平台店铺走顺丰取号，传了先查店铺再按授权决定走哪条路。
+body: |
+  【判断规则很简单】
+
+  **不传平台店铺 ID** → 直接走**顺丰**取号，这是最常用的路径。
+
+  **传了平台店铺 ID** → 先查你这个应用下有没有配这个店铺：
+  · 查不到 → 报「平台店铺 id 没有配置」
+  · 查到了 → 再判断店铺有没有开通电子面单授权：
+    开通了走**顺丰**，没开通走**丰门**
+
+  【所以要传平台店铺 ID 吗】
+  · 只发顺丰，不需要 → 不传
+  · 要按店铺区分走不同渠道 → 必须传，且要先把店铺配好
+
+  【重复取号会怎样】
+  幂等机制：先向外部取号 → 拿到运单号 → 再按「运单号 + 应用」查重。
+  重复的返回「重复下单，运单号已存在」；并发时（30 秒内）返回「取号中，请稍后」。
+  **查重是在取号之后做的**，不会重复占用运单号，但会多打一次外部接口。
+
+  【付款方式的限制】
+  顺丰只支持寄付、到付、三方三种。传「寄付现结」会被**强制改成寄付**。
+
+  【其他前置条件】
+  组织必须配好顾客编码和校验码；传了月结卡要过月结卡校验；
+  收件信息必填；打赏费如果传，必须在 100 到 3000 之间。
+
+  【失败常见原因】
+  应用 ID 非法、平台店铺 ID 没配置、月结卡号未验证、
+  调用丰门接口报错、重复下单、没获取到运单号。
+
+  【和标准下单的区别】
+  这个接口落的是面单订单表，标准下单落的是通用订单表。
+  两条链路不通用，取消、查询、打印也要对应用哪套接口。
+anchors: [O2O取号, 电子面单通用取号, oto createOrder, 丰门取号, 平台店铺ID, 取号重复, 寄付现结被改, 面单取号]
+module: 顺店通开放接口
+entry_path: ""
+roles: [客户技术对接人, 二线支持]
+permissions: []
+source_ref:
+  - docs/openapi-business-logic.md#6.1 oto createOrder
+  - docs/notes/C-o2o-city-callback.md#11 createOrder
+  - eps-store-core-united-store-be/united-store-open-server/src/main/java/com/sf/united/store/openserver/service/impl/OtoOpenServiceImpl.java#L145
+owner: "01415465"
+verified_at: 2026-11-25
+expires_at: 2027-05-25
+related: [sdt-api-idempotent-scope, sdt-api-oto-print, sdt-api-oto-interceptor]

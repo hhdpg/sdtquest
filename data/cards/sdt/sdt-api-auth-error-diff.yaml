@@ -1,0 +1,50 @@
+card_id: sdt-api-auth-error-diff
+type: trouble
+title: 都报「参数异常」，到底是签名错了还是参数漏了？
+one_liner: 这两个错误码是同一个值，光看码分不出来，只能看报错文案。
+body: |
+  【核心问题】
+  「参数异常」和「非法请求（签名不通过）」用的是**同一个错误码**。
+  所以你收到这个码时，无法从码本身判断是哪一类，必须看 errorMessage。
+
+  【怎么按文案区分】
+
+  **文案含「is empty」**
+  → 四个鉴权参数缺了（appId / requestId / timestamp / sign）
+
+  **文案含「timestamp」**
+  → 时间戳位数不对或超过 15 分钟
+
+  **文案含「appId非法」**
+  → 两种可能：appId 不是纯数字，或者这个组织在顺店通不存在
+
+  **文案含「非法请求」或没有具体业务文案**
+  → 基本是签名算错了。回头检查排序、分隔符、大小写。
+
+  **文案是具体业务描述**
+  → 签名已经过了，问题在业务参数或业务状态。
+
+  【一个反直觉的点】
+  签名过了但查不到数据，也会是类似的码。
+  因为签名只校验 appId 是不是合法组织，
+  **不校验 appId 和报文里的运单、店铺是不是同一个组织**。
+  这类越权是在各自的业务逻辑里判断的。
+
+  【排查顺序建议】
+  1. 先确认四个参数都传了且非空
+  2. 再看时间戳位数和时钟
+  3. 最后才怀疑签名算法
+  按这个顺序能省掉大部分排查时间。
+anchors: [参数异常, 非法请求, 错误码重复, US_100003, 签名不通过, appId非法, 鉴权失败, 报错分不清, 接口报错区分, 接口参数异常]
+module: 顺店通开放接口
+entry_path: ""
+roles: [客户技术对接人, 二线支持]
+permissions: []
+source_ref:
+  - docs/openapi-error-codes.md#1 使用方式
+  - docs/openapi-business-logic.md#1.2 签名与时间窗
+  - eps-store-core-united-store-be/united-store-common/src/main/java/com/sf/united/store/common/enums/ErrorCode.java
+owner: "01415465"
+verified_at: 2026-11-25
+expires_at: 2027-05-25
+related: [sdt-api-sign-howto, sdt-api-timestamp-window, sdt-api-how-to-get-appid]

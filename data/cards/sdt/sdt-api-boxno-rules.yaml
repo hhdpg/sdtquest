@@ -1,0 +1,56 @@
+card_id: sdt-api-boxno-rules
+type: rule
+title: 箱号有什么规则？为什么老报箱号重复或数量不对？
+one_liner: 箱号数量必须等于件数、1–50 字符、全局唯一，且有校验时间窗口。
+body: |
+  【下单时对箱号的四条硬要求】
+
+  **1. 箱号数量和件数必须一一对应**
+  寄 3 件就要给 3 个箱号，多一个少一个都拒。
+  不传箱号是允许的（按无箱号单处理），
+  但只要传了就必须齐全。
+
+  **2. 单个箱号长度 1–50 字符**
+  超长会拒。
+
+  **3. 箱号总量上限 1000 个**
+  超过会拒。一张单寄 1000 件以上本身也不合理。
+
+  **4. 箱号全局唯一**
+  这是最容易踩的：箱号在系统里是全局唯一的，
+  不能用别的单已经用过的箱号。
+
+  【唯一性的时间窗口】
+  有个配置项控制校验范围：
+  · 配成大于 0：只校验最近这么多天
+  · 配成 0：全量校验（历史所有单都算）
+  · 配成小于 0：跳过校验，不做唯一性检查
+
+  所以「为什么别人能用我不能用」，很可能就是窗口配置不同。
+
+  【子单申请时箱号规则不一样，特别注意】
+  子单申请时**必须和母单保持一致**：
+  · 母单有箱号 → 子单必须传箱号
+  · 母单没箱号 → 子单**不允许**传箱号
+
+  这个规则反过来很多客户会搞错，
+  报错是「子单申请中有箱号已被使用」或者直接被拒。
+
+  【重复箱号会怎样】
+  一般直接拒。
+  但店配下单 V2 如果开了自动合单的重试开关，
+  重复箱号会返回上一次的运单号（不算失败）。
+  返回文案会带「箱号 xx 重复下单，返回上一次运单号」。
+anchors: [箱号规则, 箱号重复, 箱号数量, 箱号唯一, boxNo, 子单箱号, 箱号已被使用, 箱号校验窗口, 件数箱号不一致, 接口下单箱号报错]
+module: 顺店通开放接口
+entry_path: ""
+roles: [客户技术对接人, 二线支持]
+permissions: []
+source_ref:
+  - docs/openapi-business-logic.md#2.2 统一下单
+  - docs/openapi-business-logic.md#2.7 子单号申请
+  - eps-store-core-united-store-be/united-store-open-server/src/main/java/com/sf/united/store/openserver/service/impl/OrderZDServiceImpl.java#L88
+owner: "01415465"
+verified_at: 2026-11-25
+expires_at: 2027-05-25
+related: [sdt-api-create-order-fail-reasons, sdt-api-sub-order-apply, sdt-api-order-variant-diff]

@@ -1,0 +1,51 @@
+card_id: sdt-api-subsidy-order-rules
+type: rule
+title: 国补订单有什么特殊要求？为什么国补单下不了？
+one_liner: 国补单只能一票一件，必须带微派商户码和任务编码，取消还要带标识。
+body: |
+  【下单时的三条硬约束】
+
+  **1. 一票一件**
+  国补单强制一个运单只能寄一件货。
+  传多件会直接被拒。
+  需要寄多件的话要拆成多张单。
+
+  **2. 必须传微派商户码 + 微派任务编码**
+  缺任何一个都会拒。
+  这两个值来自顺丰侧的微派任务体系，不是你随便填的。
+
+  【取消时】
+  必须在扩展信息里带国补标识，标识值为「取消」。
+  没带的话取消接口无法识别这是国补单，会走普通取消路径。
+
+  【订单确认时】
+  国补单**只允许在派件前修改**。若只传运单号去确认、且订单已到派送中及以后，
+  会报「国补订单只能在派件前修改订单」。确认时同样要带微派商户码和任务编码。
+
+  【国补信息是怎么推给你的】
+  顺店通会主动推国补信息给你的接收地址，包含运单号、IMEI/SN（3C 类才有）、
+  微派任务编码、图片列表、扫描结果（家电类才有）。
+
+  图片地址是**加密的**：需用顺店通分配的 16 位密钥做 AES256 解密（全零 IV）。
+
+  【推送失败怎么判断】
+  返回里有 success 和 retryFlag 两个字段，**retryFlag 永远等于 success**，看一个即可。
+  success=false 时不要重试；错误码 1000 多为报文问题、配置缺失或运单号查不到。
+
+  【排查三板斧】
+  1. 运单号能不能在顺店通查到
+  2. 你这个客户有没有配接收地址和解密密钥
+  3. 密钥和顺丰分配给你的是不是一致
+anchors: [国补订单, 国补单, 一票一件, wpMerchantCode, wpServiceCode, 微派任务编码, 国补取消, 国补推送, 图片解密, subsidySource]
+module: 顺店通开放接口
+entry_path: ""
+roles: [客户技术对接人, 二线支持]
+permissions: []
+source_ref:
+  - docs/openapi-business-logic.md#2.2 统一下单
+  - docs/openapi-business-logic.md#2.10 国补订单信息推送
+  - docs/notes/A-order.md#11 国补订单信息推送
+owner: "01415465"
+verified_at: 2026-11-25
+expires_at: 2027-05-25
+related: [sdt-api-create-order-fail-reasons, sdt-api-cancel-state-machine]

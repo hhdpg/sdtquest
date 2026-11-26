@@ -1,0 +1,61 @@
+card_id: sdt-api-tc-cancel-order
+type: rule
+title: 同城订单什么时候不能取消？
+one_liner: 取件之后就不能取消了，取消只把订单标记删除、状态不变。
+body: |
+  【唯一的状态限制】
+  订单状态是空、或者已经到「已取件」及以后 → 不能取消。
+  报错是「取件后不可取消下单」。
+
+  也就是说：
+  · 刚下的单、还没有骑士接单 → 可以取消
+  · 骑士已经取到货 → 不能取消
+
+  没有「部分取消」这种能力。
+
+  【取消时怎么定位订单】
+  用同城订单号（顺丰侧那个单号）去查本地单：
+  · 查不到 → 报「未查询到订单」
+  · 查到了 → 再查本地订单表，还查不到 → 同样报未查询到
+
+  所以要么你用错单号了，要么这张单本地没落成功。
+
+  【取消成功后状态怎么变】
+  本地订单被标记为**删除**，但**订单状态字段不变**。
+  这是软删除：记录还在，但不可再用。
+
+  所以「取消后为什么状态还是之前那个」—— 是设计如此。
+  判断是否取消看的是删除标记，不是状态字段。
+
+  【和普通下单取消的区别】
+  · 普通下单取消：先删本地再调顺丰，丰桥失败后本地已删
+  · 同城下单取消：先调同城取消，成功后才标记删除
+  同城的顺序更安全，失败了可以重试。
+
+  【取消参数】
+  · 同城订单号（必填）
+  · 订单类型（必填）
+  · 店铺类型
+  · 取消原因
+  · 推送时间
+
+  【典型失败】
+  订单未查询到、取件后不可取消、同城侧返回失败。
+
+  【给客户的建议】
+  取消放在业务侧的状态机里控制：
+  一旦收到骑士接单的回调，就把取消按钮置灰，
+  减少无效调用。
+anchors: [同城取消, tc cancelOrder, 取件后不可取消, 同城订单取消, 软删除, 未查询到订单, 骑士接单后取消]
+module: 顺店通开放接口
+entry_path: ""
+roles: [客户技术对接人, 二线支持]
+permissions: []
+source_ref:
+  - docs/openapi-business-logic.md#8.3 tc cancelOrder
+  - docs/notes/C-o2o-city-callback.md#32 其余同城接口
+  - eps-store-core-united-store-be/united-store-open-server/src/main/java/com/sf/united/store/openserver/service/impl/OpenicServiceImpl.java#L496
+owner: "01415465"
+verified_at: 2026-11-25
+expires_at: 2027-05-25
+related: [sdt-api-tc-create-order, sdt-api-tc-callback-status, sdt-api-cancel-state-machine]

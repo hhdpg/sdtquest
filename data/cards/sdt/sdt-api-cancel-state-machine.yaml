@@ -1,0 +1,52 @@
+card_id: sdt-api-cancel-state-machine
+type: rule
+title: 取消订单有什么条件？为什么报「不能取消」？
+one_liner: 只能取消没取件的开放平台单，且必须是自己组织的单。
+body: |
+  【四条硬条件，全部满足才能取消】
+
+  **1. 订单状态必须是「已导入」或「未收件」**
+  一旦取件（状态到 2 及以后）就不能取消，报「非待收件状态不能取消订单」。
+  这是业务规则，不是 bug。
+
+  **2. 必须是开放平台创建的单**
+  只能取消通过开放接口下的单，报「只能取消开放平台创建的订单」。
+
+  **3. 必须是自己组织的单**
+  报「只能操作本门店订单」。
+
+  **4. 不能是已因「客户已取消寄件」变异常的单**
+  报「此单已取消，不可重复取消」。
+
+  【状态和取消能力对照】
+  · 已导入 / 未收件 → **可以取消**
+  · 已取件、运输中、派送中、已签收 → 不能取消
+  · 异常件（客户已取消寄件）→ 不能重复取消
+
+  【取消时有顺序问题（重要）】
+  取消是**先删本地单、再调顺丰取消**。
+  如果顺丰那一步失败，本地订单已经被删掉了，**不会回滚**。
+  这时候你重试会得到「订单不存在」。
+
+  所以：**取消接口返回失败后，不要盲目重试**，
+  先去查这张单在系统里还在不在。不在就说明本地已删、顺丰侧需人工处理。
+
+  【国补单额外要求】
+  取消时必须带国补标识（值为「取消」），否则走普通取消路径。
+
+  【取消成功后】
+  订单变成软删除状态，记录还在但不可用。
+  用运单号查询会查不到这张单了。
+anchors: [取消订单, 取消条件, 不能取消, 非待收件状态, 取件后不可取消, 重复取消, 取消失败, 只能取消开放平台订单, 取消后查不到, 取消后报订单不存在]
+module: 顺店通开放接口
+entry_path: ""
+roles: [客户技术对接人, 二线支持]
+permissions: []
+source_ref:
+  - docs/openapi-business-logic.md#2.8 cancel order 与 orderV2
+  - docs/openapi-business-logic.md#11.4 取消订单报订单不存在
+  - eps-store-core-united-store-be/united-store-open-server/src/main/java/com/sf/united/store/openserver/service/impl/OrderConfirmServiceImpl.java#L89
+owner: "01415465"
+verified_at: 2026-11-25
+expires_at: 2027-05-25
+related: [sdt-api-cancel-v1-v2-diff, sdt-api-order-created-but-failed, sdt-api-subsidy-order-rules]

@@ -1,0 +1,49 @@
+card_id: sdt-api-third-token
+type: rule
+title: 第三方 Token 接口怎么用？为什么报「时间错误」？
+one_liner: 四个字段都是加密的，时间窗只有 180 秒，返回的是裸 token 字符串。
+body: |
+  【四个入参】
+  · 客户来源标识（明文，用于查到对应密钥）
+  · 用户名（加密）
+  · 用户 ID（加密）
+  · 时间戳（加密）
+
+  后三个要先用**顺店通给你方的公钥加密**再传，传明文会解密失败。
+
+  【时间窗只有 180 秒（和普通接口不一样）】
+  普通开放接口是 ±15 分钟，这个接口是 **±180 秒**。
+  所以不能缓存时间戳、不能提前算好放着，网络慢要留足余量。
+  报「时间错误」基本都是这个原因。
+
+  【返回的是裸 token】
+  这个接口的成功响应**不是标准包装结构**，直接返回一个 token 字符串。
+  解析框架假定所有接口返回统一结构的话会失败，要单独处理。
+
+  【流程】
+  用来源标识查密钥 → 私钥解密时间戳并校验 180 秒 → 解密用户名和用户 ID
+  → 查用户拿组织编码 → 换 access_token。
+
+  【凭证怎么配】
+  顺店通侧为你们配置来源标识、公钥私钥、角色 ID，线下给，不是自助配。
+
+  【失败原因】
+  来源标识非法（没配）、时间错误（超 180 秒）、
+  用户不存在（用户名对不上）、登录失败（返回空）。
+
+  【用在哪】
+  典型场景是 H5 页面跳转认证：你们的页面要嵌到顺店通里，
+  先用这个接口换 token，再带 token 访问页面。
+anchors: [第三方token, getThirdToken, 获取token, 时间错误, 180秒, RSA加密参数, 裸token, H5跳转认证]
+module: 顺店通开放接口
+entry_path: ""
+roles: [客户技术对接人]
+permissions: []
+source_ref:
+  - docs/openapi-business-logic.md#6.5 getThirdToken
+  - docs/notes/C-o2o-city-callback.md#19 getThirdToken
+  - eps-store-core-united-store-be/united-store-open-server/src/main/java/com/sf/united/store/openserver/controller/AuthController.java#L64
+owner: "01415465"
+verified_at: 2026-11-25
+expires_at: 2027-05-25
+related: [sdt-api-timeout-vs-token-window, sdt-api-sign-howto]

@@ -1,0 +1,42 @@
+card_id: sdt-api-timestamp-window
+type: rule
+title: 接口报「时间戳超时」是什么原因？时间戳有什么要求？
+one_liner: 时间戳只能 10 位或 13 位，且与服务器时间差不能超过 15 分钟。
+body: |
+  【两个硬性要求】
+
+  **要求一：位数只能是 10 位或 13 位**
+  · 10 位 = 秒级
+  · 13 位 = 毫秒级
+  · 其他位数（比如 11、12 位）一律报参数异常。
+  · 服务端把 10 位自动乘 1000 转成毫秒再比。
+
+  **要求二：与服务器时间差不能超过 ±15 分钟**
+  报错文案是「request timestamp timeout 15 minutes」。
+  注意是**双向**的：比你快 16 分钟也报错，
+  客户端时钟慢 16 分钟也报错。
+
+  【所以要注意】
+  · 不要缓存时间戳复用，每次请求重新取。
+  · 队列重试的场景最容易踩：重试时时间戳已经过期，
+    必须重新生成 requestId、timestamp、sign 三个值。
+    我们自己的推送重推就是这么做的。
+
+  【和第三方 Token 的区别】
+  如果你用的是第三方 Token 获取接口（H5 跳转认证那类），
+  那里的时间窗只有 **±180 秒**，不是 15 分钟，别搞混。
+
+  【时钟同步建议】
+  NTP 服务要保持同步。服务器时间漂移是最隐蔽的故障源。
+anchors: [时间戳超时, timestamp超时, 时间戳错误, 15分钟, 时钟偏移, request timestamp timeout, 时间戳无效, 重试时间戳过期]
+module: 顺店通开放接口
+entry_path: ""
+roles: [客户技术对接人]
+permissions: []
+source_ref:
+  - docs/openapi-business-logic.md#1.2 签名与时间窗
+  - eps-store-core-united-store-be/united-store-open-server/src/main/java/com/sf/united/store/openserver/util/CheckParamUtil.java#L69
+owner: "01415465"
+verified_at: 2026-11-25
+expires_at: 2027-05-25
+related: [sdt-api-sign-howto, sdt-api-auth-error-diff]

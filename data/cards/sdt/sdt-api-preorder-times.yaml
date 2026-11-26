@@ -1,0 +1,53 @@
+card_id: sdt-api-preorder-times
+type: rule
+title: 预下单接口是干什么的？会占运单号吗？
+one_liner: 只查可选取件时间段，不占运单号、不落库、不发快递。
+body: |
+  【它只做一件事：告诉你什么时候能上门取件】
+  返回的是可选的日期 + 起止时间段列表。
+  让你在做预约取件的界面时，有个可选范围。
+
+  【不会发生的事（很重要）】
+  · **不占运单号**
+  · **不落库**，系统里不会有任何订单记录
+  · **不通知顺丰取件**
+  · 不发任何消息
+
+  所以你可以放心地在前端下拉框里反复调这个接口。
+
+  【要传什么】
+  · 客户订单号（只做标识用，不产生订单）
+  · 托寄物名称
+  · 月结卡号
+  · 快递产品编码
+  · 收寄双方的地址和联系人
+
+  【会失败的情况】
+  错误码是从顺丰原样透传的：
+  · 参数错误 → 检查必填项
+  · 地址不可达 → 顺丰送不到这个地址
+  · 系统异常 → 顺丰侧问题，重试
+
+  另外鉴权用的是同城那套签名方法，和其他接口的通用签名方法不同，
+  但算法规则是一样的（四个值排序拼接算 MD5）。
+
+  【和下单的关系】
+  预下单查好了时间段，真正下单时把这个时间段传给下单接口的
+  「预约取件时间」字段。两步是分开的，预下单不会帮你下单。
+
+  【一个细节】
+  下单时传了预约取件时间，顺店通会额外做一次取件时间校验，
+  时间太近会被拒（报「取件时间太近，多给小哥留点时间吧」）。
+  所以前端最好限定最早可选时间。
+anchors: [预下单, 取件时间, 预约取件, preorder, times, 可选取件时间, 不占运单号, 取件时间太近, 上门时间]
+module: 顺店通开放接口
+entry_path: ""
+roles: [客户技术对接人]
+permissions: []
+source_ref:
+  - docs/openapi-business-logic.md#2.5 preorder times
+  - eps-store-core-united-store-be/united-store-open-server/src/main/java/com/sf/united/store/openserver/service/impl/PreOrderServiceImpl.java#L41
+owner: "01415465"
+verified_at: 2026-11-25
+expires_at: 2027-05-25
+related: [sdt-api-sub-order-apply, sdt-api-create-order-fail-reasons]
